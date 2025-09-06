@@ -1,11 +1,13 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { CreateTableCommand, DeleteTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
+import { CreateTableCommand, DeleteTableCommand, DescribeTableCommand, ListTablesCommand } from "@aws-sdk/client-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { getConfigurations } from "configurations-sdk";
 
 
 const dynamoDbClientParams = {};
+
+
 
 const isRunningOnLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 if (!isRunningOnLambda) {
@@ -78,6 +80,12 @@ export const createProjectsTable = async () => {
 		console.error("Error creating projects table:", error);
 		throw error;
 	}
+};
+
+export const listTables = async () => {
+	const command = new ListTablesCommand({});
+	const result = await client.send(command);
+	return result.TableNames;
 };
 
 export const createUsageTable = async () => {
@@ -416,6 +424,14 @@ const runAsCLI = async () => {
         console.log('Operation completed:', result);
       } catch (error) {
         console.error('Failed to create users table:', error);
+      }
+    } else if (command === 'list-tables') {
+      console.log('Listing tables...');
+      try {
+        const result = await listTables();
+        console.log('Operation completed:', result);
+      } catch (error) {
+        console.error('Failed to list tables:', error);
       }
     } else {
       console.log('Available commands:');
