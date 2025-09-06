@@ -24,9 +24,30 @@ const app = express();
 /**
  * Initialize the AWS SDK Dynamo Doc Client.
  */
-const USERS_TABLE_NAME = process.env.USERS_TABLE_NAME;
-const dynamoDbClient = new DynamoDBClient();
-const dynamoDbDocClient = DynamoDBDocumentClient.from(dynamoDbClient);
+const USERS_TABLE_NAME = process.env.USERS_TABLE_NAME || "users-table-dev";
+process.env.SHARED_TOKEN_SECRET = "secret";
+process.env.REFRESH_TOKEN_SECRET = "secret";
+process.env.EVENT_BUS_NAME = "event-bus-dev";
+
+const dynamoDbClientParams = {};
+
+const isRunningOnLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+if (!isRunningOnLambda) {
+	dynamoDbClientParams.region = "us-east-1";
+	dynamoDbClientParams.endpoint = "http://localhost:8000";
+	dynamoDbClientParams.credentials = {
+		accessKeyId: "fakeMyKeyId",
+		secretAccessKey: "fakeSecretAccessKey",
+	};
+
+	process.env.PROJECTS_TABLE_NAME = "projects-table-dev";
+	process.env.USAGE_TABLE_NAME = "usage-table-dev";
+	process.env.USERS_TABLE_NAME = "users-table-dev";
+}
+
+const client = new DynamoDBClient(dynamoDbClientParams);
+const dynamoDbDocClient = DynamoDBDocumentClient.from(client);
+
 
 /**
  * Initialize the AWS SDK EventBridge Client.
@@ -168,7 +189,8 @@ app.post("/register", async (req, res) => {
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: "7d" }
     );
-
+    console.log("Creating user in database");
+    console.log(email, passwordHash, userId, refreshToken);
     const command = new PutCommand({
       TableName: USERS_TABLE_NAME,
       Item: {

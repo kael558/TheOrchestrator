@@ -1,11 +1,9 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
+import { CreateTableCommand, DeleteTableCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { getConfigurations } from "configurations-sdk";
-import pkg from '@aws-sdk/lib-dynamodb';
-// const { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, PutCommand, ScanCommand} = pkg;
-// import pkg from '@aws-sdk/lib-dynamodb';
+
 
 const dynamoDbClientParams = {};
 
@@ -124,31 +122,84 @@ export const createUsageTable = async () => {
 	}
 };
 
+export const deleteUsersTable = async () => {
+	const tableName = process.env.USERS_TABLE_NAME;
+	
+	try {
+		const command = new DeleteTableCommand({
+			TableName: tableName
+		});
+		const result = await client.send(command);
+		console.log(`Users table '${tableName}' deleted successfully`);
+		
+		// Wait for table to be fully deleted
+		let tableExists = true;
+		while (tableExists) {
+			try {
+				await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+				// Try to describe table - if it throws an error, table is deleted
+				const describeCommand = new DescribeTableCommand({
+					TableName: tableName
+				});
+				await client.send(describeCommand);
+			} catch (error) {
+				if (error.name === 'ResourceNotFoundException') {
+					tableExists = false;
+					console.log(`Users table '${tableName}' fully deleted`);
+				}
+			}
+		}
+		
+		return result;
+	} catch (error) {
+		if (error.name === 'ResourceNotFoundException') {
+			console.log(`Users table '${tableName}' does not exist`);
+			return { message: "Table does not exist" };
+		}
+		console.error("Error deleting users table:", error);
+		throw error;
+	}
+};
+
 export const createUsersTable = async () => {
 	const tableName = process.env.USERS_TABLE_NAME;
+	
+	// First delete existing table if it exists
+	await deleteUsersTable();
+	
 	const createTableParams = {
 		TableName: tableName,
 		KeySchema: [
 			{
-				AttributeName: "PK",
+				AttributeName: "userId",
 				KeyType: "HASH"
-			},
-			{
-				AttributeName: "SK",
-				KeyType: "RANGE"
 			}
 		],
 		AttributeDefinitions: [
 			{
-				AttributeName: "PK",
+				AttributeName: "userId",
 				AttributeType: "S"
 			},
 			{
-				AttributeName: "SK",
+				AttributeName: "email",
 				AttributeType: "S"
 			}
 		],
-		BillingMode: "PAY_PER_REQUEST"
+		BillingMode: "PAY_PER_REQUEST",
+		GlobalSecondaryIndexes: [
+			{
+				IndexName: "emailIndex",
+				KeySchema: [
+					{
+						AttributeName: "email",
+						KeyType: "HASH"
+					}
+				],
+				Projection: {
+					ProjectionType: "ALL"
+				}
+			}
+		]
 	};
 
 	try {
@@ -166,9 +217,10 @@ export const createUsersTable = async () => {
 	}
 };
 
-//createUsageTable();
 
-//createUsersTable();
+
+
+
 
 export const createProject = async (userId) => {
 	const projectId = uuidv4();
@@ -349,9 +401,27 @@ const runAsCLI = async () => {
       } catch (error) {
         console.error('Failed to create table:', error);
       }
+    } else if (command === 'create-usage-table') {
+      console.log('Creating usage table...');
+      try {
+        const result = await createUsageTable();
+        console.log('Operation completed:', result);
+      } catch (error) {
+        console.error('Failed to create usage table:', error);
+      }
+    } else if (command === 'create-users-table') {
+      console.log('Creating users table...');
+      try {
+        const result = await createUsersTable();
+        console.log('Operation completed:', result);
+      } catch (error) {
+        console.error('Failed to create users table:', error);
+      }
     } else {
       console.log('Available commands:');
       console.log('  create-table - Creates the projects table if it doesn\'t exist');
+      console.log('  create-usage-table - Creates the usage table if it doesn\'t exist');
+      console.log('  create-users-table - Deletes and recreates the users table with correct structure');
     }
   }
 };
