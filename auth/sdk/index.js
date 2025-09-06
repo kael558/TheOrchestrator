@@ -8,7 +8,7 @@ import { expressjwt } from "express-jwt";
  */
 export class Auth {
   constructor({ secret }) {
-    this.secret = secret || process.env.SHARED_TOKEN_SECRET;
+    this.secret = secret || process.env.SHARED_TOKEN_SECRET || "secret";
   }
 
   verify(token) {
@@ -26,7 +26,7 @@ export class Auth {
  */
 export const authMiddleware = ({ secret } = {}) => {
   return expressjwt({
-    secret: secret || process.env.SHARED_TOKEN_SECRET,
+    secret: secret || process.env.SHARED_TOKEN_SECRET || "secret",
     algorithms: ["HS256"],
   });
 };

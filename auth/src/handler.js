@@ -257,7 +257,7 @@ app.post("/login", async (req, res) => {
     const accessToken = jwt.sign(
       { email, userId },
       process.env.SHARED_TOKEN_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign(
       { email, userId },
@@ -341,6 +341,10 @@ app.use((req, res, next) => {
   return res.status(404).json({
     error: "Not Found",
   });
+});
+
+app.listen(3100, () => {
+  console.log("Server is running on port 3100. Localhost: http://localhost:3100");
 });
 
 export const handler = serverless(app);

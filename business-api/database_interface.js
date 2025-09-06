@@ -17,6 +17,7 @@ if (!isRunningOnLambda) {
 
 	process.env.PROJECTS_TABLE_NAME = "projects-table-dev";
 	process.env.USAGE_TABLE_NAME = "usage-table-dev";
+	process.env.USERS_TABLE_NAME = "users-table-dev";
 }
 
 const client = new DynamoDBClient(dynamoDbClientParams);
@@ -77,6 +78,94 @@ export const createProjectsTable = async () => {
 		throw error;
 	}
 };
+
+export const createUsageTable = async () => {
+	const tableName = process.env.USAGE_TABLE_NAME;
+	const createTableParams = {
+		TableName: tableName,
+		KeySchema: [
+			{
+				AttributeName: "PK",
+				KeyType: "HASH"
+			},
+			{
+				AttributeName: "SK",
+				KeyType: "RANGE"
+			}
+		],
+		AttributeDefinitions: [
+			{
+				AttributeName: "PK",
+				AttributeType: "S"
+			},
+			{
+				AttributeName: "SK",
+				AttributeType: "S"
+			}
+		],
+		BillingMode: "PAY_PER_REQUEST"
+	};
+
+	try {
+		const command = new CreateTableCommand(createTableParams);
+		const result = await client.send(command);
+		console.log(`Usage table '${tableName}' created successfully:`, result.TableDescription.TableStatus);
+		return result;
+	} catch (error) {
+		if (error.name === 'ResourceInUseException') {
+			console.log(`Usage table '${tableName}' already exists`);
+			return { message: "Table already exists" };
+		}
+		console.error("Error creating usage table:", error);
+		throw error;
+	}
+};
+
+export const createUsersTable = async () => {
+	const tableName = process.env.USERS_TABLE_NAME;
+	const createTableParams = {
+		TableName: tableName,
+		KeySchema: [
+			{
+				AttributeName: "PK",
+				KeyType: "HASH"
+			},
+			{
+				AttributeName: "SK",
+				KeyType: "RANGE"
+			}
+		],
+		AttributeDefinitions: [
+			{
+				AttributeName: "PK",
+				AttributeType: "S"
+			},
+			{
+				AttributeName: "SK",
+				AttributeType: "S"
+			}
+		],
+		BillingMode: "PAY_PER_REQUEST"
+	};
+
+	try {
+		const command = new CreateTableCommand(createTableParams);
+		const result = await client.send(command);
+		console.log(`Users table '${tableName}' created successfully:`, result.TableDescription.TableStatus);
+		return result;
+	} catch (error) {
+		if (error.name === 'ResourceInUseException') {
+			console.log(`Users table '${tableName}' already exists`);
+			return { message: "Table already exists" };
+		}
+		console.error("Error creating users table:", error);
+		throw error;
+	}
+};
+
+//createUsageTable();
+
+//createUsersTable();
 
 export const createProject = async (userId) => {
 	const projectId = uuidv4();

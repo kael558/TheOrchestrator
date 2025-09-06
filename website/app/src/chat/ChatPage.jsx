@@ -93,9 +93,10 @@ const ChatPage = () => {
     setMessageHistory((message) => message.concat(userMessage));
     setInput('');
     scrollToBottom();
+    const token = await getToken();
     const response = await fetch(chatApiUrl, {
       headers: {
-        Authorization: `Bearer ${getToken()}`,
+        Authorization: `Bearer ${token}`,
       },
       method: 'POST',
       body: JSON.stringify([...messageHistory, userMessage]),
