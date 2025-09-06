@@ -125,6 +125,7 @@ const ExampleComponent = ({
 	};
 
 	const getRowHoverColor = () => {
+		
 		if (results?.status === "rejected") return "hover:bg-red-200";
 		if (results?.status === "approved") return "hover:bg-green-200";
 		return "hover:bg-orange-200";

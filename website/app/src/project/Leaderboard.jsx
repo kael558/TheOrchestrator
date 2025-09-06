@@ -35,7 +35,7 @@ const Leaderboard = ({
 
         examples.forEach((example) => {
 
-            if (example[config.name]?.status) {
+            if (example[config.name] && example[config.name][example[selectedConfig]?.status]) {
                 
                 chartData[config.name][example[selectedConfig].status]++;
             }

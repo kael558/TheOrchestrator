@@ -1,3 +1,11 @@
+# TODO
+[ ] Fix run test function (basically a result should come back from running the test)
+  - Maybe includes a fixed chat function for each model (that cant be edited)
+[ ] Add the optimization function that adjusts the code for that model
+[ ] Set up endpoint and show it to user that they can use it (that is the best chosen one)
+[ ] 
+
+
 
 # TODO  
 [x] Add GROQ models  
@@ -11,6 +19,9 @@
 # Remake
 [ ] Construct complete request on frontend, basically just a wrapper for fetch. Then also write the parser on the frontend as well.
 [ ] Use backend as Proxy only. 
+
+
+[ ]
 
 
 

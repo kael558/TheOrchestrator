@@ -4,7 +4,7 @@
 	"version": "0.0.0",
 	"type": "module",
 	"scripts": {
-		"dev": "cross-env VITE_BUSINESS_API_URL=https://jxj681wi0g.execute-api.us-east-1.amazonaws.com VITE_CHAT_API_URL=https://m6oq29rs3e.execute-api.us-east-1.amazonaws.com VITE_STREAM_API_URL=https://udeqsrexlaof7bbrfslejy6eqi0clarp.lambda-url.us-east-1.on.aws VITE_AUTH_API_URL=https://dw5iu6fktg.execute-api.us-east-1.amazonaws.com vite",
+		"dev": "vite",
 		"build": "vite build",
 		"lint": "eslint .",
 		"preview": "vite preview"

@@ -4,6 +4,7 @@ import LoginPage from "./auth/LoginPage";
 import RegistrationPage from "./auth/RegistrationPage";
 import ProjectPage from "./project/Project";
 import ProjectsPage from "./projects/ProjectsPage";
+import Landing from "./app/Landing";
 
 import { AuthProvider } from "./auth/AuthProvider";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
@@ -16,13 +17,14 @@ import { QueryClient, QueryClientProvider } from "react-query";
 const AppRoutes = () => {
   return (
     <Routes>
+      <Route path="/" element={<Landing />} />
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegistrationPage />} />
       </Route>
       <Route path="">
         <Route element={<ProtectedRoute loginPath="/login" />}>
-          <Route path="" element={<Navigate to="/projects" />} />
+          <Route path="/dashboard" element={<Navigate to="/projects" />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
         </Route>
