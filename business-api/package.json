@@ -2,7 +2,7 @@
   "name": "api",
   "version": "1.0.0",
   "description": "",
-
+  "type": "module",
   "devDependencies": {
     "serverless-domain-manager": "^7.4.0"
   },
