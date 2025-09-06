@@ -3,6 +3,9 @@ import { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, Delete
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 import { v4 as uuidv4 } from 'uuid';
 import { getConfigurations } from "configurations-sdk";
+import pkg from '@aws-sdk/lib-dynamodb';
+// const { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, PutCommand, ScanCommand} = pkg;
+// import pkg from '@aws-sdk/lib-dynamodb';
 
 const dynamoDbClientParams = {};
 
@@ -242,3 +245,27 @@ export const getUsage = async (userId, modelName) => {
 	);
 	const globalUsageMetrics = globalUsageRecords.Items[0];
 }
+
+// CLI functionality for running via command line
+const runAsCLI = async () => {
+  // Check if script is being run directly
+  if (process.argv[1].endsWith('database_interface.js')) {
+    const command = process.argv[2];
+    
+    if (command === 'create-table') {
+      console.log('Creating projects table...');
+      try {
+        const result = await createProjectsTable();
+        console.log('Operation completed:', result);
+      } catch (error) {
+        console.error('Failed to create table:', error);
+      }
+    } else {
+      console.log('Available commands:');
+      console.log('  create-table - Creates the projects table if it doesn\'t exist');
+    }
+  }
+};
+
+// Run the CLI handler
+runAsCLI();
