@@ -1,0 +1,44 @@
+{
+	"name": "app",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "cross-env VITE_BUSINESS_API_URL=https://jxj681wi0g.execute-api.us-east-1.amazonaws.com VITE_CHAT_API_URL=https://m6oq29rs3e.execute-api.us-east-1.amazonaws.com VITE_STREAM_API_URL=https://udeqsrexlaof7bbrfslejy6eqi0clarp.lambda-url.us-east-1.on.aws VITE_AUTH_API_URL=https://dw5iu6fktg.execute-api.us-east-1.amazonaws.com vite",
+		"build": "vite build",
+		"lint": "eslint .",
+		"preview": "vite preview"
+	},
+	"dependencies": {
+		"@headlessui/react": "^2.1.8",
+		"@heroicons/react": "^1.0.6",
+		"esbuild": "^0.24.0",
+		"jwt-decode": "^4.0.0",
+		"react": "^18.3.1",
+		"react-ace": "^12.0.0",
+		"react-dom": "^18.3.1",
+		"react-icons": "^5.3.0",
+		"react-markdown": "^9.0.1",
+		"react-query": "^3.39.3",
+		"react-router-dom": "^6.26.1",
+		"recharts": "^2.12.7",
+		"remark-breaks": "^4.0.0",
+		"remark-gfm": "^4.0.0"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.9.0",
+		"@types/react": "^18.3.3",
+		"@types/react-dom": "^18.3.0",
+		"@vitejs/plugin-react": "^4.3.1",
+		"autoprefixer": "^10.4.20",
+		"cross-env": "^7.0.3",
+		"eslint": "^9.9.0",
+		"eslint-plugin-react": "^7.35.0",
+		"eslint-plugin-react-hooks": "^5.1.0-rc.0",
+		"eslint-plugin-react-refresh": "^0.4.9",
+		"globals": "^15.9.0",
+		"postcss": "^8.4.44",
+		"tailwindcss": "^3.4.10",
+		"vite": "^5.4.1"
+	}
+}

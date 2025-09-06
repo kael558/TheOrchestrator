@@ -1,0 +1,92 @@
+service: business
+
+stages:
+  default:
+    params:
+      customDomainNameAuthAPI: api.NA
+      projectsTableName: projects-table-${sls:stage}
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  environment:
+    SHARED_TOKEN_SECRET: ${param:sharedTokenSecret, 'DEFAULT'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ProjectsTable, Arn]
+            - Fn::Join:
+                - ''
+                - - Fn::GetAtt: [ProjectsTable, Arn]
+                  - '/index/*'
+
+plugins:
+  - serverless-domain-manager
+
+build:
+  esbuild: true
+
+custom:
+  customDomain:
+    domainName: ${param:customDomainNameAuthAPI}
+    certificateArn: ${param:customDomainCertificateARN, 'NA'}
+    stage: ""
+    endpointType: regional
+    apiType: http
+    autoDomain: true
+    enabled: ${param:customDomainNameEnabled, false}
+    basePath: ${self:service}
+
+functions:
+  api:
+    handler: handler.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: any
+    environment:
+      PROJECTS_TABLE_NAME: ${param:projectsTableName}
+
+resources:
+  Conditions:
+    CustomDomainNameEnabled:
+      Fn::Equals:
+        - ${param:customDomainNameEnabled, false}
+        - true
+  Resources:
+    ProjectsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: projectId
+            AttributeType: S
+          - AttributeName: createdByUserId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: projectId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${param:projectsTableName}
+        GlobalSecondaryIndexes:
+          - IndexName: createdByUserIdIndex
+            KeySchema:
+              - AttributeName: createdByUserId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+  Outputs:
+    BusinessApiUrl:
+      Value:
+        Fn::If:
+          - CustomDomainNameEnabled
+          - !Sub "https://${param:customDomainNameAuthAPI}/${self:service}"
+          - !GetAtt HttpApi.ApiEndpoint

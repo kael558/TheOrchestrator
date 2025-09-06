@@ -1,0 +1,10 @@
+td textarea {
+    border: none;
+    resize: none;
+  }
+
+td {
+    max-width: 200px; /* Adjust this value as per your requirement */
+  
+    white-space: pre-wrap;
+  }

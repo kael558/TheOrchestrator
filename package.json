@@ -1,0 +1,11 @@
+{
+  "name": "serverlessinc-example",
+  "version": "1.0.0",
+  "description": "Lambda AI Boilerplate (LAB) for Serverless Framework V.4",
+  "private": true,
+  "workspaces": [
+    "**"
+  ],
+  "dependencies": {
+  }
+}
