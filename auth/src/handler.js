@@ -206,18 +206,7 @@ app.post("/register", async (req, res) => {
      * The user is created successfully, and we can send an event to the Event
      * Bridge to notify other services that a new user has been created.
      */
-    const eventPayload = {
-      Entries: [
-        {
-          Source: "auth.register",
-          EventBusName: process.env.EVENT_BUS_NAME,
-          DetailType: "authRegisterType",
-          Detail: JSON.stringify({ email, userId }),
-        },
-      ],
-    };
-    const eventBridgeCommand = new PutEventsCommand(eventPayload);
-    await eventBridgeClient.send(eventBridgeCommand);
+   
 
 
     res.json({ token: accessToken, refreshToken, email, userId });
