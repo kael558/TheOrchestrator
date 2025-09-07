@@ -1,15 +1,15 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
-  GetCommand,
-  QueryCommand,
-  PutCommand,
-  DeleteCommand,
-  UpdateCommand,
+	DynamoDBDocumentClient,
+	GetCommand,
+	QueryCommand,
+	PutCommand,
+	DeleteCommand,
+	UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
-  EventBridgeClient,
-  PutEventsCommand,
+	EventBridgeClient,
+	PutEventsCommand,
 } from "@aws-sdk/client-eventbridge";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -25,9 +25,6 @@ const app = express();
  * Initialize the AWS SDK Dynamo Doc Client.
  */
 const USERS_TABLE_NAME = process.env.USERS_TABLE_NAME || "users-table-dev";
-process.env.SHARED_TOKEN_SECRET = "secret";
-process.env.REFRESH_TOKEN_SECRET = "secret";
-process.env.EVENT_BUS_NAME = "event-bus-dev";
 
 const dynamoDbClientParams = {};
 
@@ -40,14 +37,22 @@ if (!isRunningOnLambda) {
 		secretAccessKey: "fakeSecretAccessKey",
 	};
 
+	// Set local development environment variables
 	process.env.PROJECTS_TABLE_NAME = "projects-table-dev";
 	process.env.USAGE_TABLE_NAME = "usage-table-dev";
 	process.env.USERS_TABLE_NAME = "users-table-dev";
+	process.env.SHARED_TOKEN_SECRET =
+		process.env.SHARED_TOKEN_SECRET || "DEFAULT";
+	process.env.REFRESH_TOKEN_SECRET =
+		process.env.REFRESH_TOKEN_SECRET || "DEFAULT";
+	process.env.EVENT_BUS_NAME = "event-bus-dev";
+} else {
+	// In Lambda, these should come from serverless.yml environment configuration
+	process.env.EVENT_BUS_NAME = process.env.EVENT_BUS_NAME || "event-bus-dev";
 }
 
 const client = new DynamoDBClient(dynamoDbClientParams);
 const dynamoDbDocClient = DynamoDBDocumentClient.from(client);
-
 
 /**
  * Initialize the AWS SDK EventBridge Client.
@@ -61,301 +66,295 @@ const eventBridgeClient = new EventBridgeClient();
 app.use(cors());
 app.use(express.json());
 
-
 app.post("/refresh", async (req, res) => {
-  const { refreshToken } = req.body;
+	const { refreshToken } = req.body;
 
-  if (!refreshToken) {
-    res.status(400).json({ error: "Refresh token is required" });
-    return;
-  }
+	if (!refreshToken) {
+		res.status(400).json({ error: "Refresh token is required" });
+		return;
+	}
 
-  try {
-    // Verify the refresh token
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    const { userId, email } = decoded;
+	try {
+		// Verify the refresh token
+		const decoded = jwt.verify(
+			refreshToken,
+			process.env.REFRESH_TOKEN_SECRET
+		);
+		const { userId, email } = decoded;
 
-    // Check if the user exists and the refresh token is still valid
-    const command = new GetCommand({
-      TableName: USERS_TABLE_NAME,
-      Key: { userId },
-    });
-    const { Item: user } = await dynamoDbDocClient.send(command);
+		// Check if the user exists and the refresh token is still valid
+		const command = new GetCommand({
+			TableName: USERS_TABLE_NAME,
+			Key: { userId },
+		});
+		const { Item: user } = await dynamoDbDocClient.send(command);
 
-    if (!user || user.refreshToken !== refreshToken) {
-      res.status(401).json({ error: "Invalid refresh token" });
-      return;
-    }
+		if (!user || user.refreshToken !== refreshToken) {
+			res.status(401).json({ error: "Invalid refresh token" });
+			return;
+		}
 
-    // Generate new access token and refresh token
-    const newAccessToken = jwt.sign(
-      { userId, email },
-      process.env.SHARED_TOKEN_SECRET,
-      { expiresIn: "1h" }
-    );
-    const newRefreshToken = jwt.sign(
-      { userId, email },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
+		// Generate new access token and refresh token
+		const newAccessToken = jwt.sign(
+			{ userId, email },
+			process.env.SHARED_TOKEN_SECRET,
+			{ expiresIn: "1h" }
+		);
+		const newRefreshToken = jwt.sign(
+			{ userId, email },
+			process.env.REFRESH_TOKEN_SECRET,
+			{ expiresIn: "7d" }
+		);
 
-    // Update the refresh token in the database
-    const updateCommand = new UpdateCommand({
-      TableName: USERS_TABLE_NAME,
-      Key: { userId },
-      UpdateExpression: "SET refreshToken = :refreshToken",
-      ExpressionAttributeValues: {
-        ":refreshToken": newRefreshToken,
-      },
-    });
-    await dynamoDbDocClient.send(updateCommand);
+		// Update the refresh token in the database
+		const updateCommand = new UpdateCommand({
+			TableName: USERS_TABLE_NAME,
+			Key: { userId },
+			UpdateExpression: "SET refreshToken = :refreshToken",
+			ExpressionAttributeValues: {
+				":refreshToken": newRefreshToken,
+			},
+		});
+		await dynamoDbDocClient.send(updateCommand);
 
-    res.json({ token: newAccessToken, refreshToken: newRefreshToken });
-  } catch (error) {
-    console.error(error);
-    res.status(401).json({ error: "Invalid refresh token" });
-  }
+		res.json({ token: newAccessToken, refreshToken: newRefreshToken });
+	} catch (error) {
+		console.error(error);
+		res.status(401).json({ error: "Invalid refresh token" });
+	}
 });
 
 app.post("/register", async (req, res) => {
-  const { email, password } = req.body;
+	const { email, password } = req.body;
 
-  /**
-   * This example has inline validation for the email and password; however,
-   * in a real-world application, you would want to use a middleware library
-   * like express-validator to validate the request payload.
-   */
-  if (typeof email !== "string" || email.length < 4) {
-    res
-      .status(400)
-      .json({ error: "'email' must be a string and at least 4 chars long" });
-    return;
-  }
+	/**
+	 * This example has inline validation for the email and password; however,
+	 * in a real-world application, you would want to use a middleware library
+	 * like express-validator to validate the request payload.
+	 */
+	if (typeof email !== "string" || email.length < 4) {
+		res.status(400).json({
+			error: "'email' must be a string and at least 4 chars long",
+		});
+		return;
+	}
 
-  if (typeof password !== "string" || password.length < 8) {
-    res
-      .status(400)
-      .json({ error: "'password' must be a string and at least 8 chars long" });
-    return;
-  }
+	if (typeof password !== "string" || password.length < 8) {
+		res.status(400).json({
+			error: "'password' must be a string and at least 8 chars long",
+		});
+		return;
+	}
 
-  /**
-   * Before creating a new user, check if the user already exists.
-   */
-  try {
-    const params = {
-      TableName: USERS_TABLE_NAME,
-      IndexName: "emailIndex",
-      KeyConditionExpression: "email = :email",
-      ExpressionAttributeValues: {
-        ":email": email,
-      },
-    };
-    const command = new QueryCommand(params);
-    const { Items } = await dynamoDbDocClient.send(command);
-    if (Items.length > 0) {
-      res.status(400).json({ error: "User already exists" });
-      return;
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Could not create user" });
-    return;
-  }
+	/**
+	 * Before creating a new user, check if the user already exists.
+	 */
+	try {
+		const params = {
+			TableName: USERS_TABLE_NAME,
+			IndexName: "emailIndex",
+			KeyConditionExpression: "email = :email",
+			ExpressionAttributeValues: {
+				":email": email,
+			},
+		};
+		const command = new QueryCommand(params);
+		const { Items } = await dynamoDbDocClient.send(command);
+		if (Items.length > 0) {
+			res.status(400).json({ error: "User already exists" });
+			return;
+		}
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Could not create user" });
+		return;
+	}
 
+	/**
+	 * The password is hashed using bcrypt before storing it in the dynamo.
+	 */
+	const passwordHash = await bcrypt.hash(password, 10);
 
-  /**
-   * The password is hashed using bcrypt before storing it in the dynamo.
-   */
-  const passwordHash = await bcrypt.hash(password, 10);
+	/**
+	 * Saves the user in the DynamoDB table.
+	 */
+	try {
+		const userId = uuid();
 
-  /**
-   * Saves the user in the DynamoDB table.
-   */
-  try {
-    const userId = uuid();
+		/**
+		 * The user is created successfully, and we can generate a JWT token to send
+		 * in response to the client.
+		 */
+		const accessToken = jwt.sign(
+			{ email, userId },
+			process.env.SHARED_TOKEN_SECRET,
+			{ expiresIn: "1h" }
+		);
+		const refreshToken = jwt.sign(
+			{ email, userId },
+			process.env.REFRESH_TOKEN_SECRET,
+			{ expiresIn: "7d" }
+		);
 
-    /**
-       * The user is created successfully, and we can generate a JWT token to send
-       * in response to the client.
-       */
-    const accessToken = jwt.sign(
-      { email, userId },
-      process.env.SHARED_TOKEN_SECRET,
-      { expiresIn: "1h" }
-    );
-    const refreshToken = jwt.sign(
-      { email, userId },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
-    console.log("Creating user in database");
-    console.log(email, passwordHash, userId, refreshToken);
-    const command = new PutCommand({
-      TableName: USERS_TABLE_NAME,
-      Item: {
-        email,
-        passwordHash,
-        userId,
-        refreshToken,
-      },
-    });
-    await dynamoDbDocClient.send(command);
+		const command = new PutCommand({
+			TableName: USERS_TABLE_NAME,
+			Item: {
+				email,
+				passwordHash,
+				userId,
+				refreshToken,
+			},
+		});
+		await dynamoDbDocClient.send(command);
 
-    /**
-     * The user is created successfully, and we can send an event to the Event
-     * Bridge to notify other services that a new user has been created.
-     */
-   
+		/**
+		 * The user is created successfully, and we can send an event to the Event
+		 * Bridge to notify other services that a new user has been created.
+		 */
 
-
-    res.json({ token: accessToken, refreshToken, email, userId });
-    return;
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Could not create user" });
-    return;
-  }
+		res.json({ token: accessToken, refreshToken, email, userId });
+		return;
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Could not create user" });
+		return;
+	}
 });
 
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+	const { email, password } = req.body;
 
-  /**
-   * Validate the email and password were provided.
-   */
-  if (!email || !password) {
-    res.status(400).json({ error: "Invalid email or password" });
-    return;
-  }
+	/**
+	 * Validate the email and password were provided.
+	 */
+	if (!email || !password) {
+		res.status(400).json({ error: "Invalid email or password" });
+		return;
+	}
 
-  try {
-    /**
-     * Query the DynamoDB table to get the user by email. Since this is a GSI,
-     * we use a Query operation instead of a Get operation, and therefore the
-     * response will be an array of items.
-     */
-    const params = {
-      TableName: USERS_TABLE_NAME,
-      IndexName: "emailIndex", // Specify the name of the GSI
-      KeyConditionExpression: "email = :email",
-      ExpressionAttributeValues: {
-        ":email": email,
-      },
-    };
-    const command = new QueryCommand(params);
-    const { Items } = await dynamoDbDocClient.send(command);
-    if (!Items || Items.length === 0) {
-      res.status(400).json({ error: "Invalid email or password" });
-      return;
-    }
+	try {
+		/**
+		 * Query the DynamoDB table to get the user by email. Since this is a GSI,
+		 * we use a Query operation instead of a Get operation, and therefore the
+		 * response will be an array of items.
+		 */
+		const params = {
+			TableName: USERS_TABLE_NAME,
+			IndexName: "emailIndex", // Specify the name of the GSI
+			KeyConditionExpression: "email = :email",
+			ExpressionAttributeValues: {
+				":email": email,
+			},
+		};
+		const command = new QueryCommand(params);
+		const { Items } = await dynamoDbDocClient.send(command);
+		if (!Items || Items.length === 0) {
+			res.status(400).json({ error: "Invalid email or password" });
+			return;
+		}
 
-    /**
-     * Get the userId and passwordHash from the first item in the response, and
-     * use bcrypt to validate the password.
-     */
-    const { passwordHash, userId } = Items[0];
-    const isPasswordValid = await bcrypt.compare(password, passwordHash);
-    if (!isPasswordValid) {
-      res.status(400).json({ error: "Invalid email or password" });
-      return;
-    }
+		/**
+		 * Get the userId and passwordHash from the first item in the response, and
+		 * use bcrypt to validate the password.
+		 */
+		const { passwordHash, userId } = Items[0];
+		const isPasswordValid = await bcrypt.compare(password, passwordHash);
+		if (!isPasswordValid) {
+			res.status(400).json({ error: "Invalid email or password" });
+			return;
+		}
 
-    /**
-     * The user is authenticated successfully, and we can generate a JWT token
-     * to send in response to the client, with the email address and userId.
-     */
-    const accessToken = jwt.sign(
-      { email, userId },
-      process.env.SHARED_TOKEN_SECRET,
-      { expiresIn: "1h" }
-    );
-    const refreshToken = jwt.sign(
-      { email, userId },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
-  
-    // Store the refresh token in the database
-    const updateCommand = new UpdateCommand({
-      TableName: USERS_TABLE_NAME,
-      Key: { userId },
-      UpdateExpression: "SET refreshToken = :refreshToken",
-      ExpressionAttributeValues: {
-        ":refreshToken": refreshToken,
-      },
-    });
-    await dynamoDbDocClient.send(updateCommand);
-  
-    res.json({ token: accessToken, refreshToken, email, userId });
-    return;
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Could not log in" });
-    return;
-  }
+		/**
+		 * The user is authenticated successfully, and we can generate a JWT token
+		 * to send in response to the client, with the email address and userId.
+		 */
+		const accessToken = jwt.sign(
+			{ email, userId },
+			process.env.SHARED_TOKEN_SECRET,
+			{ expiresIn: "1h" }
+		);
+		const refreshToken = jwt.sign(
+			{ email, userId },
+			process.env.REFRESH_TOKEN_SECRET,
+			{ expiresIn: "7d" }
+		);
+
+		// Store the refresh token in the database
+		const updateCommand = new UpdateCommand({
+			TableName: USERS_TABLE_NAME,
+			Key: { userId },
+			UpdateExpression: "SET refreshToken = :refreshToken",
+			ExpressionAttributeValues: {
+				":refreshToken": refreshToken,
+			},
+		});
+		await dynamoDbDocClient.send(updateCommand);
+
+		res.json({ token: accessToken, refreshToken, email, userId });
+		return;
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "Could not log in" });
+		return;
+	}
 });
 
 app.delete("/users/:userId", authMiddleware(), async (req, res) => {
-  const tokenUserId = req.auth.userId;
-  const paramUserId = req.params.userId;
+	const tokenUserId = req.auth.userId;
+	const paramUserId = req.params.userId;
 
-  if (tokenUserId !== paramUserId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
+	if (tokenUserId !== paramUserId) {
+		res.status(403).json({ error: "Forbidden" });
+		return;
+	}
 
-  const command = new DeleteCommand({
-    TableName: USERS_TABLE_NAME,
-    Key: { userId: tokenUserId },
-  });
-  await dynamoDbDocClient.send(command);
+	const command = new DeleteCommand({
+		TableName: USERS_TABLE_NAME,
+		Key: { userId: tokenUserId },
+	});
+	await dynamoDbDocClient.send(command);
 
-  res.json({});
-  return;
+	res.json({});
+	return;
 });
 
 app.get("/users/:userId", authMiddleware(), async (req, res) => {
-  const tokenUserId = req.auth.userId;
-  const paramUserId = req.params.userId;
+	const tokenUserId = req.auth.userId;
+	const paramUserId = req.params.userId;
 
-  if (tokenUserId !== paramUserId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
+	if (tokenUserId !== paramUserId) {
+		res.status(403).json({ error: "Forbidden" });
+		return;
+	}
 
-  const command = new GetCommand({
-    TableName: USERS_TABLE_NAME,
-    Key: { userId: tokenUserId },
-  });
-  const { Item } = await dynamoDbDocClient.send(command);
+	const command = new GetCommand({
+		TableName: USERS_TABLE_NAME,
+		Key: { userId: tokenUserId },
+	});
+	const { Item } = await dynamoDbDocClient.send(command);
 
-  if (!Item) {
-    res.status(404).json({ error: "Not Found" });
-    return;
-  }
+	if (!Item) {
+		res.status(404).json({ error: "Not Found" });
+		return;
+	}
 
-  res.json({ userId: Item.userId, email: Item.email });
-  return;
+	res.json({ userId: Item.userId, email: Item.email });
+	return;
 });
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  if (err.name === "UnauthorizedError") {
-    return res.status(401).json({ error: "Invalid token" });
-  } else {
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
+	console.error(err);
+	if (err.name === "UnauthorizedError") {
+		return res.status(401).json({ error: "Invalid token" });
+	} else {
+		return res.status(500).json({ error: "Internal Server Error" });
+	}
 });
 
 app.use((req, res, next) => {
-  return res.status(404).json({
-    error: "Not Found",
-  });
-});
-
-app.listen(3100, () => {
-  console.log("Server is running on port 3100. Localhost: http://localhost:3100");
+	return res.status(404).json({
+		error: "Not Found",
+	});
 });
 
 export const handler = serverless(app);
