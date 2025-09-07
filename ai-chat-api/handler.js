@@ -1,21 +1,22 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
-  QueryCommand,
-  UpdateCommand,
+	DynamoDBDocumentClient,
+	QueryCommand,
+	UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { z } from "zod";
 import { compileRequest } from "configurations-sdk";
-import { postRequest, streamPostRequest, addAuthorizationAndCountInputTokens } from "./requests_handler.js";
+import {
+	postRequest,
+	streamPostRequest,
+	addAuthorizationAndCountInputTokens,
+} from "./requests_handler.js";
 import { TokensTab } from "./tokenCalculator.js";
-
-
 
 import { Auth, authMiddleware } from "auth-sdk";
 import serverless from "serverless-http";
 import express from "express";
 import cors from "cors";
-
 
 const app = express();
 
@@ -37,16 +38,16 @@ app.use(authMiddleware());
  * A small utility to easily capture the status codes in the error handlers.
  */
 class HTTPError extends Error {
-  constructor(statusCode, message) {
-    super(message);
-    this.statusCode = statusCode;
-  }
+	constructor(statusCode, message) {
+		super(message);
+		this.statusCode = statusCode;
+	}
 }
 
 /**
  * Initialize the AWS SDK Dynamo Doc Client.
  */
-const USAGE_TABLE_NAME = process.env.USAGE_TABLE_NAME;
+const USAGE_TABLE_NAME = process.env.USAGE_TABLE_NAME || "usage-table-dev";
 const dynamoDbClient = new DynamoDBClient();
 const dynamoDbDocClient = DynamoDBDocumentClient.from(dynamoDbClient);
 
@@ -56,67 +57,77 @@ const dynamoDbDocClient = DynamoDBDocumentClient.from(dynamoDbClient);
  * input.
  */
 const inputSchema = z.object({
-  parameters: z.record(z.any()),
-  inputs: z.any(),
+	parameters: z.record(z.any()),
+	inputs: z.any(),
 });
 
 async function checkUsageAndThrottle(userId, modelId = "fixed") {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const queryParams = (pk) => ({
-    TableName: USAGE_TABLE_NAME,
-    KeyConditionExpression: "PK = :pk AND SK = :sk",
-    ExpressionAttributeValues: {
-      ":pk": pk,
-      ":sk": `MODEL#${modelId}`,
-    },
-  });
+	const now = new Date();
+	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+	const queryParams = (pk) => ({
+		TableName: USAGE_TABLE_NAME,
+		KeyConditionExpression: "PK = :pk AND SK = :sk",
+		ExpressionAttributeValues: {
+			":pk": pk,
+			":sk": `MODEL#${modelId}`,
+		},
+	});
 
-  const userUsageKey = `USER#${userId}#${startOfMonth.toISOString()}`;
-  const globalUsageKey = `GLOBAL#${startOfMonth.toISOString()}`;
+	const userUsageKey = `USER#${userId}#${startOfMonth.toISOString()}`;
+	const globalUsageKey = `GLOBAL#${startOfMonth.toISOString()}`;
 
-  const userUsageCommand = new QueryCommand(queryParams(userUsageKey));
-  const userUsageRecords = await dynamoDbDocClient.send(userUsageCommand);
-  const userUsageMetrics = userUsageRecords.Items[0];
+	const userUsageCommand = new QueryCommand(queryParams(userUsageKey));
+	const userUsageRecords = await dynamoDbDocClient.send(userUsageCommand);
+	const userUsageMetrics = userUsageRecords.Items[0];
 
-  const globalUsageCommand = new QueryCommand(queryParams(globalUsageKey));
-  const globalUsageRecords = await dynamoDbDocClient.send(globalUsageCommand);
-  const globalUsageMetrics = globalUsageRecords.Items[0];
+	const globalUsageCommand = new QueryCommand(queryParams(globalUsageKey));
+	const globalUsageRecords = await dynamoDbDocClient.send(globalUsageCommand);
+	const globalUsageMetrics = globalUsageRecords.Items[0];
 
-  if (
-    userUsageMetrics?.invocationCount >= process.env.THROTTLE_MONTHLY_LIMIT_USER ||
-    globalUsageMetrics?.invocationCount >= process.env.THROTTLE_MONTHLY_LIMIT_GLOBAL
-  ) {
-    throw new HTTPError(429, `User has exceeded the user or global monthly usage limit`);
-  }
+	if (
+		userUsageMetrics?.invocationCount >=
+			process.env.THROTTLE_MONTHLY_LIMIT_USER ||
+		globalUsageMetrics?.invocationCount >=
+			process.env.THROTTLE_MONTHLY_LIMIT_GLOBAL
+	) {
+		throw new HTTPError(
+			429,
+			`User has exceeded the user or global monthly usage limit`
+		);
+	}
 }
 
 async function updateUsage(userId, modelId, inputTokens, outputTokens) {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const updateParams = (pk) => ({
-    TableName: USAGE_TABLE_NAME,
-    Key: {
-      PK: pk,
-      SK: `MODEL#${modelId}`,
-    },
-    UpdateExpression: "ADD invocationCount :inc, inputTokens :in, outputTokens :out, totalTokens :tot",
-    ExpressionAttributeValues: {
-      ":inc": 1,
-      ":in": inputTokens,
-      ":out": outputTokens,
-      ":tot": inputTokens + outputTokens,
-    },
-  });
+	const now = new Date();
+	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+	const updateParams = (pk) => ({
+		TableName: USAGE_TABLE_NAME,
+		Key: {
+			PK: pk,
+			SK: `MODEL#${modelId}`,
+		},
+		UpdateExpression:
+			"ADD invocationCount :inc, inputTokens :in, outputTokens :out, totalTokens :tot",
+		ExpressionAttributeValues: {
+			":inc": 1,
+			":in": inputTokens,
+			":out": outputTokens,
+			":tot": inputTokens + outputTokens,
+		},
+	});
 
-  const userUsageKey = `USER#${userId}#${startOfMonth.toISOString()}`;
-  const globalUsageKey = `GLOBAL#${startOfMonth.toISOString()}`;
+	const userUsageKey = `USER#${userId}#${startOfMonth.toISOString()}`;
+	const globalUsageKey = `GLOBAL#${startOfMonth.toISOString()}`;
 
-  const userUsageUpdateCommand = new UpdateCommand(updateParams(userUsageKey));
-  const globalUsageUpdateCommand = new UpdateCommand(updateParams(globalUsageKey));
+	const userUsageUpdateCommand = new UpdateCommand(
+		updateParams(userUsageKey)
+	);
+	const globalUsageUpdateCommand = new UpdateCommand(
+		updateParams(globalUsageKey)
+	);
 
-  await dynamoDbDocClient.send(userUsageUpdateCommand);
-  await dynamoDbDocClient.send(globalUsageUpdateCommand);
+	await dynamoDbDocClient.send(userUsageUpdateCommand);
+	await dynamoDbDocClient.send(globalUsageUpdateCommand);
 }
 
 /**
@@ -125,130 +136,156 @@ async function updateUsage(userId, modelId, inputTokens, outputTokens) {
  * externally at the moment, therefore this method can't be run locally using
  * Serverless Dev mode.
  */
+/*
 export const handler = awslambda.streamifyResponse(
-  async (event, responseStream, context) => {
-    /**
-     * responseStream is a Writeable Stream and doesn't provide method to update
-     * the headers, statusCode, therefore we use HttpResponseStream.from to
-     * create a new responseStream with the new response headers.
-     */
-    const updateStream = ({ statusCode } = {}) => {
-      const httpResponseMetadata = {
-        statusCode: statusCode || 200,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      };
-      responseStream = awslambda.HttpResponseStream.from(responseStream, httpResponseMetadata);
-    };
+	async (event, responseStream, context) => {
 
-    try {
-      const authenticator = new Auth({
-        secret: process.env.SHARED_TOKEN_SECRET,
-      });
+		const updateStream = ({ statusCode } = {}) => {
+			const httpResponseMetadata = {
+				statusCode: statusCode || 200,
+				headers: {
+					"Content-Type": "application/json",
+				},
+			};
+			responseStream = awslambda.HttpResponseStream.from(
+				responseStream,
+				httpResponseMetadata
+			);
+		};
 
-      const requestTokenHeader = event.headers.Authorization || event.headers.authorization;
-      const [authSchema, authorizationParameter] = (requestTokenHeader || "").split(" ");
+		try {
+			const authenticator = new Auth({
+				secret: process.env.SHARED_TOKEN_SECRET,
+			});
 
-      if (!requestTokenHeader || authSchema !== "Bearer" || !authorizationParameter) {
-        throw new HTTPError(403, "Missing bearer token in Authorization header");
-      }
+			const requestTokenHeader =
+				event.headers.Authorization || event.headers.authorization;
+			const [authSchema, authorizationParameter] = (
+				requestTokenHeader || ""
+			).split(" ");
 
-      const token = authenticator.verify(authorizationParameter);
-      if (!token) {
-        throw new HTTPError(403, "Invalid token");
-      }
+			if (
+				!requestTokenHeader ||
+				authSchema !== "Bearer" ||
+				!authorizationParameter
+			) {
+				throw new HTTPError(
+					403,
+					"Missing bearer token in Authorization header"
+				);
+			}
 
+			const token = authenticator.verify(authorizationParameter);
+			if (!token) {
+				throw new HTTPError(403, "Invalid token");
+			}
 
-      const { userId } = token;
+			const { userId } = token;
 
-      const { modelName } = event.pathParameters;
-      let { parameters, inputs } = JSON.parse(event.body);
+			const { modelName } = event.pathParameters;
+			let { parameters, inputs } = JSON.parse(event.body);
 
-      try {
-        inputSchema.parse({ parameters, inputs });
-      } catch (e) {
-        const issuePath = e.issues[0].path.join(".");
-        const issueMessage = e.issues[0].message;
-        const errorMessage = `Invalid value at '${issuePath}': ${issueMessage}`;
-        throw new HTTPError(400, errorMessage);
-      }
+			try {
+				inputSchema.parse({ parameters, inputs });
+			} catch (e) {
+				const issuePath = e.issues[0].path.join(".");
+				const issueMessage = e.issues[0].message;
+				const errorMessage = `Invalid value at '${issuePath}': ${issueMessage}`;
+				throw new HTTPError(400, errorMessage);
+			}
 
-      await checkUsageAndThrottle(userId, modelName);
+			await checkUsageAndThrottle(userId, modelName);
 
-      updateStream();
+			updateStream();
 
-      const { url, headers, payload, keysToResult } = compileRequest(modelName, parameters, inputs);
-      const inputTokens = addAuthorizationAndCountInputTokens(url, headers, payload);
+			const { url, headers, payload, keysToResult } = compileRequest(
+				modelName,
+				parameters,
+				inputs
+			);
+			const inputTokens = addAuthorizationAndCountInputTokens(
+				url,
+				headers,
+				payload
+			);
 
-      const tokensTab = new TokensTab();
-      tokensTab.addInputRequest(modelName, inputTokens);
+			const tokensTab = new TokensTab();
+			tokensTab.addInputRequest(modelName, inputTokens);
 
-      const requestStream = await streamPostRequest(url, headers, payload);
+			const requestStream = await streamPostRequest(
+				url,
+				headers,
+				payload
+			);
 
-      let outputTokens = 0;
-      for await (const chunk of requestStream) {
-        let result = JSON.parse(chunk);
-        for (let key of keysToResult) {
-          result = result[key];
-        }
+			let outputTokens = 0;
+			for await (const chunk of requestStream) {
+				let result = JSON.parse(chunk);
+				for (let key of keysToResult) {
+					result = result[key];
+				}
 
-        responseStream.write(result);
-        outputTokens += result.length;
-      }
+				responseStream.write(result);
+				outputTokens += result.length;
+			}
 
-      tokensTab.addOutputRequest(modelName, outputTokens);
+			tokensTab.addOutputRequest(modelName, outputTokens);
 
-      await updateUsage(userId, modelName, inputTokens, outputTokens);
-    } catch (error) {
-      console.error(event);
-      console.error(error);
-      if (error instanceof HTTPError) {
-        updateStream({ statusCode: error.statusCode });
-        responseStream.write(JSON.stringify({ error: error.message }));
-      } else {
-        updateStream({ statusCode: 500 });
-        responseStream.write(JSON.stringify({ error: "Internal Error" }));
-      }
-    } finally {
-      responseStream.end();
-    }
-  }
+			await updateUsage(userId, modelName, inputTokens, outputTokens);
+		} catch (error) {
+			console.error(event);
+			console.error(error);
+			if (error instanceof HTTPError) {
+				updateStream({ statusCode: error.statusCode });
+				responseStream.write(JSON.stringify({ error: error.message }));
+			} else {
+				updateStream({ statusCode: 500 });
+				responseStream.write(
+					JSON.stringify({ error: "Internal Error" })
+				);
+			}
+		} finally {
+			responseStream.end();
+		}
+	}
 );
-
+*/
 
 // Given model name, parameters & inputs, return the model output
 app.post("/proxy", async (req, res) => {
-  try {
-    
-    const { url, options } = req.body;
-    const userId = req.auth.userId;
+	try {
+		const { url, options } = req.body;
+		const userId = req.auth.userId;
 
-    await checkUsageAndThrottle(userId);
+		//await checkUsageAndThrottle(userId);
 
-    // Get the url, headers, payload from configurations
-    //const { url, headers, payload, keysToResult } = compileRequest(modelName, parameters);
+		// Get the url, headers, payload from configurations
+		//const { url, headers, payload, keysToResult } = compileRequest(modelName, parameters);
 
-    const { headers, body } = options;
+		const { headers, body } = options;
 
-    // Add auth to headers
-    const inputTokens = addAuthorizationAndCountInputTokens(url, headers, body);
+		// Add auth to headers
+		const inputTokens = addAuthorizationAndCountInputTokens(
+			url,
+			headers,
+			body
+		);
 
-    // Calculate tokens
-    //const tokensTab = new TokensTab();
-    //tokensTab.addInputRequest(modelName, inputTokens);
+		// Calculate tokens
+		//const tokensTab = new TokensTab();
+		//tokensTab.addInputRequest(modelName, inputTokens);
 
-    // Call the model execution code here
-    const [responseData, status] = await postRequest(url, headers, body);
+		// Call the model execution code here
+		const [responseData, status] = await postRequest(url, headers, body);
 
-    // Return the response from the external server back to the client
-    if (status !== 200) {
-        return res.status(status).json({ error: responseData });
-    }
+		// Return the response from the external server back to the client
+		if (status !== 200) {
+			return res.status(status).json({ error: responseData });
+		}
 
-    return res.status(status).json(responseData);
-    
-    /*if (status !== 200) {
+		return res.status(status).json(responseData);
+
+		/*if (status !== 200) {
       console.error(response);
       return res.status(status).json({ error: response });
     }
@@ -268,15 +305,25 @@ app.post("/proxy", async (req, res) => {
     await updateUsage(userId, modelName, inputTokens, outputTokens);
 
     res.json(result);*/
-  } catch (error) {
-    console.error(error);
+	} catch (error) {
+		console.error(error);
 
-    if (error instanceof HTTPError && error.status === 429) {
-      return res.status(429).json({ error: error.message });
-    }
+		if (error instanceof HTTPError && error.status === 429) {
+			return res.status(429).json({ error: error.message });
+		}
 
-    res.status(500).json({ error });
-  }
+		res.status(500).json({ error });
+	}
 });
+
+/*
+import dotenv from "dotenv";
+dotenv.config();
+
+app.listen(3200, () => {
+	console.log(
+		"Server is running on port 3200. Localhost: http://localhost:3200"
+	);
+});*/
 
 export const request_handler = serverless(app);

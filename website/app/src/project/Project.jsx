@@ -26,6 +26,7 @@ import SaveButton from "./SaveButton";
 import { debounce } from "lodash"; // You can use lodash for debouncing
 import InputSchemaComponent from "./InputSchema";
 import Leaderboard from "./Leaderboard";
+import Deploy from "./Deploy";
 
 const useProject = (projectId) => {
 	const { getProjectById } = useBusinessAPI();
@@ -36,27 +37,23 @@ const useProject = (projectId) => {
 		async () => {
 			const projectData = await getProjectById(projectId);
 
-	
-
 			// xhexk if inputCodes
 			if (!projectData.inputCodes) {
-				
 				projectData.inputCodes = [];
 				projectData?.payloadParams.forEach((param) => {
-					projectData.inputCodes.push( {
-						"name": param.name,
-						"model": param.model,
-						"inputCode": ""
+					projectData.inputCodes.push({
+						name: param.name,
+						model: param.model,
+						inputCode: "",
 					});
 				});
 
 				// delete payloadParams
 				delete projectData.payloadParams;
-				
 			}
 
 			delete projectData.results;
-		
+
 			return projectData;
 		},
 		{
@@ -111,8 +108,12 @@ const Project = () => {
 	const [newComment, setNewComment] = useState("");
 	const [currentConfig, setCurrentConfig] = useLocalStorage(
 		"currentConfig",
-		"Llama3-70b"
+		"Llama 3.3 70B Versatile"
 	);
+
+	// Loading states for operations
+	const [isRunningTests, setIsRunningTests] = useState(false);
+	const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
 
 	// Autosave
 	useEffect(() => {
@@ -139,10 +140,12 @@ const Project = () => {
 	if (error) return <div>An error occurred: {error.message}</div>;
 	if (!project) return null;
 
+	console.log("Project", project);
+	console.log("Current Config", currentConfig);
+
 	const inputCode = project.inputCodes.find(
 		(config) => config.name === currentConfig
 	).inputCode;
-
 
 	const handleNameChange = (e) => {
 		setProject({ ...project, name: e.target.value });
@@ -153,7 +156,7 @@ const Project = () => {
 	};
 
 	const addComment = () => {
-		alert("Not implemented yet")
+		alert("Not implemented yet");
 		const value = newComment.trim();
 		if (!value) return;
 
@@ -194,7 +197,6 @@ const Project = () => {
 			setSaveStatus("error");
 		}
 	};
-
 
 	return (
 		<div className="bg-gray-100 min-h-screen">
@@ -270,20 +272,22 @@ const Project = () => {
 					project={project}
 					setProject={setProject}
 					selectedConfig={currentConfig}
-		
 				/>
-
-		
 				<ExamplesComponent
 					project={project}
 					setProject={setProject}
 					inputCode={inputCode}
-				
 					currentConfig={currentConfig}
-	
 					setCommentingIndex={setCommentingIndex}
 					setViewingCommentsIndex={setViewingCommentsIndex}
+					isRunningTests={isRunningTests}
+					setIsRunningTests={setIsRunningTests}
+					isOptimizingPrompt={isOptimizingPrompt}
+					setIsOptimizingPrompt={setIsOptimizingPrompt}
+					handleSave={handleSave}
 				/>
+
+				<Deploy project={project} />
 
 				{commentingIndex !== null && (
 					<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -319,7 +323,7 @@ const Project = () => {
 					<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
 						<div className="bg-white p-4 rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto">
 							<h3 className="text-lg font-bold mb-2">Comments</h3>
-							
+
 							<div className="flex justify-end mt-4">
 								<button
 									className="bg-gray-500 text-white p-2 rounded-md hover:bg-gray-600 transition duration-200"
@@ -330,6 +334,25 @@ const Project = () => {
 									Close
 								</button>
 							</div>
+						</div>
+					</div>
+				)}
+
+				{/* Loading overlay for operations */}
+				{(isRunningTests || isOptimizingPrompt) && (
+					<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+						<div className="bg-white p-8 rounded-lg shadow-2xl flex flex-col items-center">
+							<div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+							<h3 className="text-xl font-semibold text-gray-800 mb-2">
+								{isRunningTests
+									? "Running Tests..."
+									: "Optimizing Prompt..."}
+							</h3>
+							<p className="text-gray-600 text-center">
+								{isRunningTests
+									? "Please wait while we execute your tests. This may take a few moments."
+									: "Please wait while we optimize your prompt. This may take a few moments."}
+							</p>
 						</div>
 					</div>
 				)}

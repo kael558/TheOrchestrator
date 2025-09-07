@@ -6,6 +6,7 @@ import ExampleComponent from "./ExampleComponent";
 
 import React from "react";
 import { useAuth } from "../auth/AuthProvider";
+import { useBusinessAPI } from "../services/BusinessProvider";
 
 const ExpandButton = ({ onClick }) => {
 	return (
@@ -25,15 +26,21 @@ const ExpandButton = ({ onClick }) => {
 const ExamplesComponent = ({
 	project,
 	setProject,
-	
+
 	inputCode,
 	currentConfig,
 	setCommentingIndex,
 	setViewingCommentsIndex,
+	isRunningTests,
+	setIsRunningTests,
+	isOptimizingPrompt,
+	setIsOptimizingPrompt,
+	handleSave,
 }) => {
 	const [expandedView, setExpandedView] = useState(null);
 	const projectRef = React.useRef(project);
 	const { getToken } = useAuth();
+	const { optimizePrompt: optimizePromptAPI } = useBusinessAPI();
 
 	useEffect(() => {
 		projectRef.current = project;
@@ -72,18 +79,17 @@ const ExamplesComponent = ({
 			return example;
 		});
 
-
 		setProject({ ...project, examples: updatedExamples });
 	};
 
 	const runTest = async (index) => {
-		
 		// Step 1: Fetch rewrite
 		const token = await getToken();
+		const chatApiUrl = import.meta.env.VITE_CHAT_API_URL;
 
 		const fetchRewriteStringFn = `
 			const fetchProxy = async (url, options) => {
-				const chatApiUrl = "https://m6oq29rs3e.execute-api.us-east-1.amazonaws.com/proxy";
+				const chatApiUrl = "${chatApiUrl}/proxy";
 				const body = {
 					url,
 					options,
@@ -99,25 +105,30 @@ const ExamplesComponent = ({
 				});
 			};`;
 
-
 		// Step 2: Evaluate the fetch rewrite and input code
 		let inputFn;
 
 		try {
 			// rewrite fetch to fetchProxy
-			const ic = project.inputCodes.find((config) => config.name === currentConfig).inputCode;
-			
+			const ic = project.inputCodes.find(
+				(config) => config.name === currentConfig
+			).inputCode;
+
 			const inputCode = ic.replace(/fetch/g, "fetchProxy");
 
-			inputFn = new Function(fetchRewriteStringFn + inputCode + " return fn;")();
+			inputFn = new Function(
+				fetchRewriteStringFn + inputCode + " \nreturn fn;"
+			)();
 
 			if (typeof inputFn !== "function") {
 				throw new Error("Input code must export a function.");
 			} else if (inputFn.length !== project.inputSchema.length) {
-				throw new Error(`Input function must accept ${project.inputSchema.length} arguments.`);
+				throw new Error(
+					`Input function must accept ${project.inputSchema.length} arguments.`
+				);
 			} else if (inputFn.name !== "fn") {
 				throw new Error("Input function must be named 'fn'.");
-			} 
+			}
 		} catch (error) {
 			console.error("Failed to evaluate input code:", error);
 			alert(error.message);
@@ -129,9 +140,11 @@ const ExamplesComponent = ({
 
 		try {
 			console.log("Running test for example:", index);
-			
+
 			// given the order of args in the input schema, put the values from .input in the correct order
-			const inputs = project.inputSchema.map((field) => project.examples[index].input[field.name]);
+			const inputs = project.inputSchema.map(
+				(field) => project.examples[index].input[field.name]
+			);
 
 			console.log("Inputs:", inputs);
 			({ response, result, error } = await inputFn.apply(null, inputs));
@@ -152,15 +165,17 @@ const ExamplesComponent = ({
 		};
 
 		// step 4: Put the result in the example under the config name
-		const updatedExamples = projectRef.current.examples.map((example, i) => {
-			if (i === index) {
-				return {
-					...example,
-					[currentConfig]: newResult,
-				};
+		const updatedExamples = projectRef.current.examples.map(
+			(example, i) => {
+				if (i === index) {
+					return {
+						...example,
+						[currentConfig]: newResult,
+					};
+				}
+				return example;
 			}
-			return example;
-		});
+		);
 
 		console.log("Updated examples:", updatedExamples);
 
@@ -177,18 +192,50 @@ const ExamplesComponent = ({
 	};
 
 	const runUnknownTests = async () => {
-		for (let index = 0; index < project.examples.length; index++) {
-
-			if (!project.examples[index][currentConfig]) {
-				console.log("Running test for example:", index);
-				if ((await runTest(index)) === null) break;
-				await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before next iteration
+		setIsRunningTests(true);
+		try {
+			for (let index = 0; index < project.examples.length; index++) {
+				if (!project.examples[index][currentConfig]) {
+					console.log("Running test for example:", index);
+					if ((await runTest(index)) === null) break;
+					await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before next iteration
+				}
 			}
+		} finally {
+			setIsRunningTests(false);
 		}
 	};
 
-	const optimizePrompt = () => {
-		console.log("Optimizing prompt");
+	const optimizePrompt = async () => {
+		setIsOptimizingPrompt(true);
+		try {
+			// Save the project first
+			await handleSave();
+			console.log("Optimizing prompt for config:", currentConfig);
+
+			// Call the optimize prompt API
+			const result = await optimizePromptAPI(
+				project.projectId,
+				currentConfig
+			);
+
+			if (result && result.inputCode) {
+				// Update the project with the optimized input code
+				const updatedInputCodes = project.inputCodes.map((config) =>
+					config.name === currentConfig
+						? { ...config, inputCode: result.inputCode }
+						: config
+				);
+
+				setProject({ ...project, inputCodes: updatedInputCodes });
+				console.log("Prompt optimized successfully!");
+			}
+		} catch (error) {
+			console.error("Failed to optimize prompt:", error);
+			alert("Failed to optimize prompt: " + error.message);
+		} finally {
+			setIsOptimizingPrompt(false);
+		}
 	};
 
 	const optimizeTokens = () => {
@@ -215,7 +262,7 @@ const ExamplesComponent = ({
 		// remove the example from the examples array
 		const newExamples = project.examples.filter((_, i) => i !== index);
 
-		setProject({ ...project, examples: newExamples});
+		setProject({ ...project, examples: newExamples });
 	};
 
 	const closeOnOutsideClick = (e) => {
@@ -292,7 +339,6 @@ const ExamplesComponent = ({
 								project={project}
 								setProject={setProject}
 								currentConfig={currentConfig}
-							
 								handleExpandView={handleExpandView}
 								runTest={runTest}
 								deleteExample={deleteExample}
@@ -308,26 +354,57 @@ const ExamplesComponent = ({
 				</table>
 			</div>
 			<button
-				className="bg-blue-500 text-white mb-10 px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 mt-4 flex items-center mx-auto"
+				className={`bg-blue-500 text-white mb-10 px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 mt-4 flex items-center mx-auto ${
+					isRunningTests || isOptimizingPrompt
+						? "opacity-50 cursor-not-allowed"
+						: ""
+				}`}
 				onClick={addExample}
+				disabled={isRunningTests || isOptimizingPrompt}
 			>
 				<FaPlus className="mr-2" /> Add Example
 			</button>
 			<div className="flex space-x-4">
 				<button
-					className={`bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 flex items-center `}
+					className={`bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-200 flex items-center ${
+						isRunningTests || isOptimizingPrompt
+							? "opacity-50 cursor-not-allowed"
+							: ""
+					}`}
 					onClick={runUnknownTests}
+					disabled={isRunningTests || isOptimizingPrompt}
 				>
-					<FaPlay className="mr-2" /> Run Tests
+					{isRunningTests ? (
+						<>
+							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+							Running Tests...
+						</>
+					) : (
+						<>
+							<FaPlay className="mr-2" /> Run Tests
+						</>
+					)}
 				</button>
+
 				<button
 					className={`bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition duration-200 flex items-center ${
-						true ? "opacity-50 cursor-not-allowed" : ""
+						isOptimizingPrompt || isRunningTests
+							? "opacity-50 cursor-not-allowed"
+							: ""
 					}`}
 					onClick={optimizePrompt}
-					disabled={true}
+					disabled={isOptimizingPrompt || isRunningTests}
 				>
-					<FaMagic className="mr-2" /> Optimize Prompt
+					{isOptimizingPrompt ? (
+						<>
+							<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+							Optimizing...
+						</>
+					) : (
+						<>
+							<FaMagic className="mr-2" /> Optimize
+						</>
+					)}
 				</button>
 				<button
 					className={`bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition duration-200 flex items-center ${

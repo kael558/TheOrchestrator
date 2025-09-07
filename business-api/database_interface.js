@@ -1,13 +1,23 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, QueryCommand, UpdateCommand, DeleteCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { CreateTableCommand, DeleteTableCommand, DescribeTableCommand, ListTablesCommand } from "@aws-sdk/client-dynamodb";
-import { v4 as uuidv4 } from 'uuid';
+import {
+	DynamoDBDocumentClient,
+	GetCommand,
+	QueryCommand,
+	UpdateCommand,
+	DeleteCommand,
+	PutCommand,
+	ScanCommand,
+} from "@aws-sdk/lib-dynamodb";
+import {
+	CreateTableCommand,
+	DeleteTableCommand,
+	DescribeTableCommand,
+	ListTablesCommand,
+} from "@aws-sdk/client-dynamodb";
+import { v4 as uuidv4 } from "uuid";
 import { getConfigurations } from "configurations-sdk";
 
-
 const dynamoDbClientParams = {};
-
-
 
 const isRunningOnLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 if (!isRunningOnLambda) {
@@ -18,9 +28,12 @@ if (!isRunningOnLambda) {
 		secretAccessKey: "fakeSecretAccessKey",
 	};
 
+	// Set local development environment variables
 	process.env.PROJECTS_TABLE_NAME = "projects-table-dev";
 	process.env.USAGE_TABLE_NAME = "usage-table-dev";
 	process.env.USERS_TABLE_NAME = "users-table-dev";
+	process.env.SHARED_TOKEN_SECRET =
+		process.env.SHARED_TOKEN_SECRET || "DEFAULT";
 }
 
 const client = new DynamoDBClient(dynamoDbClientParams);
@@ -31,24 +44,24 @@ const CREATED_BY_INDEX = "createdByUserIdIndex";
 
 export const createProjectsTable = async () => {
 	const tableName = PROJECTS_TABLE || "projects-table";
-	
+
 	const createTableParams = {
 		TableName: tableName,
 		AttributeDefinitions: [
 			{
 				AttributeName: "projectId",
-				AttributeType: "S"
+				AttributeType: "S",
 			},
 			{
-				AttributeName: "createdByUserId", 
-				AttributeType: "S"
-			}
+				AttributeName: "createdByUserId",
+				AttributeType: "S",
+			},
 		],
 		KeySchema: [
 			{
 				AttributeName: "projectId",
-				KeyType: "HASH"
-			}
+				KeyType: "HASH",
+			},
 		],
 		BillingMode: "PAY_PER_REQUEST",
 		GlobalSecondaryIndexes: [
@@ -57,23 +70,26 @@ export const createProjectsTable = async () => {
 				KeySchema: [
 					{
 						AttributeName: "createdByUserId",
-						KeyType: "HASH"
-					}
+						KeyType: "HASH",
+					},
 				],
 				Projection: {
-					ProjectionType: "ALL"
-				}
-			}
-		]
+					ProjectionType: "ALL",
+				},
+			},
+		],
 	};
 
 	try {
 		const command = new CreateTableCommand(createTableParams);
 		const result = await client.send(command);
-		console.log(`Projects table '${tableName}' created successfully:`, result.TableDescription.TableStatus);
+		console.log(
+			`Projects table '${tableName}' created successfully:`,
+			result.TableDescription.TableStatus
+		);
 		return result;
 	} catch (error) {
-		if (error.name === 'ResourceInUseException') {
+		if (error.name === "ResourceInUseException") {
 			console.log(`Projects table '${tableName}' already exists`);
 			return { message: "Table already exists" };
 		}
@@ -95,33 +111,36 @@ export const createUsageTable = async () => {
 		KeySchema: [
 			{
 				AttributeName: "PK",
-				KeyType: "HASH"
+				KeyType: "HASH",
 			},
 			{
 				AttributeName: "SK",
-				KeyType: "RANGE"
-			}
+				KeyType: "RANGE",
+			},
 		],
 		AttributeDefinitions: [
 			{
 				AttributeName: "PK",
-				AttributeType: "S"
+				AttributeType: "S",
 			},
 			{
 				AttributeName: "SK",
-				AttributeType: "S"
-			}
+				AttributeType: "S",
+			},
 		],
-		BillingMode: "PAY_PER_REQUEST"
+		BillingMode: "PAY_PER_REQUEST",
 	};
 
 	try {
 		const command = new CreateTableCommand(createTableParams);
 		const result = await client.send(command);
-		console.log(`Usage table '${tableName}' created successfully:`, result.TableDescription.TableStatus);
+		console.log(
+			`Usage table '${tableName}' created successfully:`,
+			result.TableDescription.TableStatus
+		);
 		return result;
 	} catch (error) {
-		if (error.name === 'ResourceInUseException') {
+		if (error.name === "ResourceInUseException") {
 			console.log(`Usage table '${tableName}' already exists`);
 			return { message: "Table already exists" };
 		}
@@ -132,35 +151,35 @@ export const createUsageTable = async () => {
 
 export const deleteUsersTable = async () => {
 	const tableName = process.env.USERS_TABLE_NAME;
-	
+
 	try {
 		const command = new DeleteTableCommand({
-			TableName: tableName
+			TableName: tableName,
 		});
 		const result = await client.send(command);
 		console.log(`Users table '${tableName}' deleted successfully`);
-		
+
 		// Wait for table to be fully deleted
 		let tableExists = true;
 		while (tableExists) {
 			try {
-				await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+				await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
 				// Try to describe table - if it throws an error, table is deleted
 				const describeCommand = new DescribeTableCommand({
-					TableName: tableName
+					TableName: tableName,
 				});
 				await client.send(describeCommand);
 			} catch (error) {
-				if (error.name === 'ResourceNotFoundException') {
+				if (error.name === "ResourceNotFoundException") {
 					tableExists = false;
 					console.log(`Users table '${tableName}' fully deleted`);
 				}
 			}
 		}
-		
+
 		return result;
 	} catch (error) {
-		if (error.name === 'ResourceNotFoundException') {
+		if (error.name === "ResourceNotFoundException") {
 			console.log(`Users table '${tableName}' does not exist`);
 			return { message: "Table does not exist" };
 		}
@@ -171,27 +190,27 @@ export const deleteUsersTable = async () => {
 
 export const createUsersTable = async () => {
 	const tableName = process.env.USERS_TABLE_NAME;
-	
+
 	// First delete existing table if it exists
 	await deleteUsersTable();
-	
+
 	const createTableParams = {
 		TableName: tableName,
 		KeySchema: [
 			{
 				AttributeName: "userId",
-				KeyType: "HASH"
-			}
+				KeyType: "HASH",
+			},
 		],
 		AttributeDefinitions: [
 			{
 				AttributeName: "userId",
-				AttributeType: "S"
+				AttributeType: "S",
 			},
 			{
 				AttributeName: "email",
-				AttributeType: "S"
-			}
+				AttributeType: "S",
+			},
 		],
 		BillingMode: "PAY_PER_REQUEST",
 		GlobalSecondaryIndexes: [
@@ -200,23 +219,26 @@ export const createUsersTable = async () => {
 				KeySchema: [
 					{
 						AttributeName: "email",
-						KeyType: "HASH"
-					}
+						KeyType: "HASH",
+					},
 				],
 				Projection: {
-					ProjectionType: "ALL"
-				}
-			}
-		]
+					ProjectionType: "ALL",
+				},
+			},
+		],
 	};
 
 	try {
 		const command = new CreateTableCommand(createTableParams);
 		const result = await client.send(command);
-		console.log(`Users table '${tableName}' created successfully:`, result.TableDescription.TableStatus);
+		console.log(
+			`Users table '${tableName}' created successfully:`,
+			result.TableDescription.TableStatus
+		);
 		return result;
 	} catch (error) {
-		if (error.name === 'ResourceInUseException') {
+		if (error.name === "ResourceInUseException") {
 			console.log(`Users table '${tableName}' already exists`);
 			return { message: "Table already exists" };
 		}
@@ -224,11 +246,6 @@ export const createUsersTable = async () => {
 		throw error;
 	}
 };
-
-
-
-
-
 
 export const createProject = async (userId) => {
 	const projectId = uuidv4();
@@ -244,7 +261,7 @@ export const createProject = async (userId) => {
 		name: "New Project",
 		examples: [],
 		inputCodes: getConfigurations(), // { "model": "code" }
-		inputSchema: []
+		inputSchema: [],
 	};
 
 	const command = new PutCommand({
@@ -265,18 +282,19 @@ export const updateProject = async (projectId, projectData) => {
 	const command = new UpdateCommand({
 		TableName: PROJECTS_TABLE,
 		Key: { projectId },
-		UpdateExpression: "SET #name = :name, examples = :examples, inputSchema = :inputSchema, inputCodes = :inputCodes, updatedAt = :updatedAt",
+		UpdateExpression:
+			"SET #name = :name, examples = :examples, inputSchema = :inputSchema, inputCodes = :inputCodes, updatedAt = :updatedAt",
 		ExpressionAttributeNames: {
-			"#name": "name"
+			"#name": "name",
 		},
 		ExpressionAttributeValues: {
 			":name": projectData.name,
 			":examples": projectData.examples,
 			":inputSchema": projectData.inputSchema,
 			":inputCodes": projectData.inputCodes,
-			":updatedAt": timestamp
+			":updatedAt": timestamp,
 		},
-		ReturnValues: "UPDATED_NEW"
+		ReturnValues: "UPDATED_NEW",
 	});
 
 	const result = await docClient.send(command);
@@ -286,13 +304,12 @@ export const updateProject = async (projectId, projectData) => {
 export const getProjectById = async (projectId, userId) => {
 	const command = new GetCommand({
 		TableName: PROJECTS_TABLE,
-		Key: { projectId }
+		Key: { projectId },
 	});
 
 	const result = await docClient.send(command);
 	return result.Item;
 };
-
 
 export const getProjectsByOwner = async (userId) => {
 	const command = new QueryCommand({
@@ -300,22 +317,21 @@ export const getProjectsByOwner = async (userId) => {
 		IndexName: CREATED_BY_INDEX,
 		KeyConditionExpression: "createdByUserId = :userId",
 		ExpressionAttributeValues: {
-			":userId": userId
-		}
+			":userId": userId,
+		},
 	});
 
 	const result = await docClient.send(command);
 	return result.Items;
 };
 
-
 export const getProjectsSharedWithYou = async (userEmail) => {
 	const command = new ScanCommand({
 		TableName: PROJECTS_TABLE,
 		FilterExpression: "contains(sharedWithUserEmails, :email)",
 		ExpressionAttributeValues: {
-			":email": userEmail
-		}
+			":email": userEmail,
+		},
 	});
 
 	const result = await docClient.send(command);
@@ -326,13 +342,13 @@ export const shareProject = async (projectId, userEmail) => {
 	// First, get the current project
 	const getCommand = new GetCommand({
 		TableName: PROJECTS_TABLE,
-		Key: { projectId }
+		Key: { projectId },
 	});
 
 	const { Item: project } = await docClient.send(getCommand);
 
 	if (!project) {
-		throw new Error('Project not found');
+		throw new Error("Project not found");
 	}
 
 	// Check if the email is already in the array
@@ -340,12 +356,13 @@ export const shareProject = async (projectId, userEmail) => {
 		const updateCommand = new UpdateCommand({
 			TableName: PROJECTS_TABLE,
 			Key: { projectId },
-			UpdateExpression: "SET sharedWithUserEmails = list_append(if_not_exists(sharedWithUserEmails, :empty_list), :new_email)",
+			UpdateExpression:
+				"SET sharedWithUserEmails = list_append(if_not_exists(sharedWithUserEmails, :empty_list), :new_email)",
 			ExpressionAttributeValues: {
 				":empty_list": [],
-				":new_email": [userEmail]
+				":new_email": [userEmail],
 			},
-			ReturnValues: "UPDATED_NEW"
+			ReturnValues: "UPDATED_NEW",
 		});
 
 		const result = await docClient.send(updateCommand);
@@ -355,18 +372,15 @@ export const shareProject = async (projectId, userEmail) => {
 	}
 };
 
-
 export const deleteProject = async (projectId) => {
 	const command = new DeleteCommand({
 		TableName: PROJECTS_TABLE,
-		Key: { projectId }
+		Key: { projectId },
 	});
 
 	const result = await docClient.send(command);
 	return result;
 };
-
-
 
 /* THROTTLE MECHANISMS */
 export const getUsage = async (userId, modelName) => {
@@ -389,57 +403,61 @@ export const getUsage = async (userId, modelName) => {
 	const userUsageMetrics = userUsageRecords.Items[0];
 
 	const globalUsageCommand = new QueryCommand(queryParams(globalUsageKey));
-	const globalUsageRecords = await docClient.send(
-		globalUsageCommand
-	);
+	const globalUsageRecords = await docClient.send(globalUsageCommand);
 	const globalUsageMetrics = globalUsageRecords.Items[0];
-}
+};
 
 // CLI functionality for running via command line
 const runAsCLI = async () => {
-  // Check if script is being run directly
-  if (process.argv[1].endsWith('database_interface.js')) {
-    const command = process.argv[2];
-    
-    if (command === 'create-table') {
-      console.log('Creating projects table...');
-      try {
-        const result = await createProjectsTable();
-        console.log('Operation completed:', result);
-      } catch (error) {
-        console.error('Failed to create table:', error);
-      }
-    } else if (command === 'create-usage-table') {
-      console.log('Creating usage table...');
-      try {
-        const result = await createUsageTable();
-        console.log('Operation completed:', result);
-      } catch (error) {
-        console.error('Failed to create usage table:', error);
-      }
-    } else if (command === 'create-users-table') {
-      console.log('Creating users table...');
-      try {
-        const result = await createUsersTable();
-        console.log('Operation completed:', result);
-      } catch (error) {
-        console.error('Failed to create users table:', error);
-      }
-    } else if (command === 'list-tables') {
-      console.log('Listing tables...');
-      try {
-        const result = await listTables();
-        console.log('Operation completed:', result);
-      } catch (error) {
-        console.error('Failed to list tables:', error);
-      }
-    } else {
-      console.log('Available commands:');
-      console.log('  create-table - Creates the projects table if it doesn\'t exist');
-      console.log('  create-usage-table - Creates the usage table if it doesn\'t exist');
-      console.log('  create-users-table - Deletes and recreates the users table with correct structure');
-    }
-  }
+	// Check if script is being run directly
+	if (process.argv[1].endsWith("database_interface.js")) {
+		const command = process.argv[2];
+
+		if (command === "create-table") {
+			console.log("Creating projects table...");
+			try {
+				const result = await createProjectsTable();
+				console.log("Operation completed:", result);
+			} catch (error) {
+				console.error("Failed to create table:", error);
+			}
+		} else if (command === "create-usage-table") {
+			console.log("Creating usage table...");
+			try {
+				const result = await createUsageTable();
+				console.log("Operation completed:", result);
+			} catch (error) {
+				console.error("Failed to create usage table:", error);
+			}
+		} else if (command === "create-users-table") {
+			console.log("Creating users table...");
+			try {
+				const result = await createUsersTable();
+				console.log("Operation completed:", result);
+			} catch (error) {
+				console.error("Failed to create users table:", error);
+			}
+		} else if (command === "list-tables") {
+			console.log("Listing tables...");
+			try {
+				const result = await listTables();
+				console.log("Operation completed:", result);
+			} catch (error) {
+				console.error("Failed to list tables:", error);
+			}
+		} else {
+			console.log("Available commands:");
+			console.log(
+				"  create-table - Creates the projects table if it doesn't exist"
+			);
+			console.log(
+				"  create-usage-table - Creates the usage table if it doesn't exist"
+			);
+			console.log(
+				"  create-users-table - Deletes and recreates the users table with correct structure"
+			);
+		}
+	}
 };
 
 // Run the CLI handler
