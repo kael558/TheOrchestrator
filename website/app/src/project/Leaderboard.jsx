@@ -24,24 +24,21 @@ const Leaderboard = ({
 	let chartData = {};
 
 	inputCodes.forEach((config) => {
-        if (!chartData[config.name]) {
-            chartData[config.name] = {
-                name: config.name,
-                approved: 0,
-                rejected: 0,
-                unknown: 0,
-            };
-        }
+		if (!chartData[config.name]) {
+			chartData[config.name] = {
+				name: config.name,
+				approved: 0,
+				rejected: 0,
+				unknown: 0,
+			};
+		}
 
-        examples.forEach((example) => {
-
-            if (example[config.name] && example[config.name][example[selectedConfig]?.status]) {
-                
-                chartData[config.name][example[selectedConfig].status]++;
-            }
-        });
+		examples.forEach((example) => {
+			if (example[config.name] && example[config.name]?.status) {
+				chartData[config.name][example[config.name].status]++;
+			}
+		});
 	});
-
 
 	const sortedChartData = Object.values(chartData).sort((a, b) => {
 		const approvedDiff = b.approved - a.approved;
