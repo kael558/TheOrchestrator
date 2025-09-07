@@ -184,6 +184,23 @@ const ExampleComponent = ({
 			))}
 
 			<td
+				className={`border-2 p-2 relative ${getCellHoverColor()} group`}
+				onClick={() => handleExpandView(example.outputDescription)}
+			>
+				<textarea
+					className="w-full p-1 border rounded min-h-[2.5rem] bg-transparent resize-none hover:bg-opacity-30"
+					value={example.outputDescription || ""}
+					placeholder="Describe the expected output format and content..."
+					onChange={(e) => {
+						const newExamples = [...project.examples];
+						newExamples[index].outputDescription = e.target.value;
+						setProject({ ...project, examples: newExamples });
+					}}
+					onClick={(e) => e.stopPropagation()}
+				/>
+			</td>
+
+			<td
 				className={`border-2 p-2 relative ${getCellHoverColor(
 					true
 				)} cursor-pointer bg-gree`}

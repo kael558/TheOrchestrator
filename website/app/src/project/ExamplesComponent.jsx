@@ -202,6 +202,7 @@ const ExamplesComponent = ({
 				return acc;
 			}, {}),
 			expectedOutput: "",
+			outputDescription: "", // Add new field for output description
 		};
 
 		setProject({
@@ -271,6 +272,9 @@ const ExamplesComponent = ({
 									{field.name}
 								</th>
 							))}
+							<th className="border p-2 text-left whitespace-nowrap">
+								Output Description
+							</th>
 							<th className="border p-2 text-left whitespace-nowrap">
 								Output
 							</th>
