@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import serverless from "serverless-http";
 import { authMiddleware } from "auth-sdk";
-import { monitorOnce } from "./api_tester.js";
+import { monitorOnce } from "./testing/api_tester.js";
 
 const app = express();
 
