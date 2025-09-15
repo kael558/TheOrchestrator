@@ -18,13 +18,13 @@ if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 
 const bucket = process.env.S3_BUCKET;
-const key = process.env.S3_KEY || "monitor_data.csv";
-const model = "gpt-4o-mini";
+const key = process.env.S3_KEY || "monitor-v2.csv";
+const models = ["gpt-4o-mini", "llama-3.3-70b-versatile"];
 
 // Realistic prompt scenarios with varying lengths and complexity
-const prompts = [
+export const prompts = [
 	// SHORT PROMPTS (5) - Minimal system instructions
-	{
+	/*{
 		id: "customer-greeting",
 		category: "short",
 		messages: [
@@ -265,6 +265,85 @@ const prompts = [
 					"We're a B2B SaaS company with a successful workflow automation product (50k users, $10M ARR). We're considering expanding into AI-powered analytics as our next major product line. The market looks promising but it's highly competitive with well-funded startups and Big Tech players. Should we build this internally, acquire a company, or partner with existing solutions? What factors should drive this strategic decision?",
 			},
 		],
+	},*/
+	{
+		id: "feleenas-context-test",
+		category: "long",
+		messages: [
+			{
+				role: "system",
+				content: `# PRIMARY ROLE
+You are a helpful AI assistant for Feleena's on their website. Your main purpose is to assist users with questions about the business and guide them towards taking action when appropriate.
+
+# CURRENT INFORMATION
+Current date and time: 2025/09/15 Monday 2:46pm
+
+# BUSINESS INFORMATION
+A Mexican restaurant, serving consistently delicious food with friendly staff. It's a go-to place for a quick bite out. Known for its tasty dishes like the Club Burrito sauce.
+
+# RESPONSE GUIDELINES
+- Answer using ONLY the information in the provided context
+- When information isn't available, respond naturally as if you're part of the business team.
+- Remember that users cannot see the internal context you're working with - respond as if you're directly representing the business
+- Use concise, professional yet friendly language
+- Format your response with Markdown (including links - please use valid URLs)
+- Use natural language and paragraph format unless bullet points are necessary 
+- Stay strictly within the scope of Feleena's's services
+- Naturally gather missing lead information during the conversation
+- Don't ask for all missing information at once - keep it conversational
+- If the user's message is not related to the business, politely inform the user that you can only assist with matters related to Feleena's and its services.
+
+Respond in a friendly manner with very short and concise responses. Keep your responses short, exciting, friendly and bubbly :) Show images in markdown if the user asks.
+
+# CUSTOM INSTRUCTIONS
+You must not take any reservations under any circumstances. Clearly inform users that patio seating is first-come, first-served and cannot be reserved. Indoor dining reservations can only be made by calling the restaurant directly (613-233-2010) and speaking to someone in person—voicemails do not count. You  must not offer to take messages or pass along reservation requests. Additionally, no food or drink orders can be placed through you. All interactions should be limited to providing general information and answering questions within these guidelines. Be empathetic to a problem someone has expressed! # ACTION INFORMATION
+## Current Action Info
+		
+{}
+
+		
+## Results from Actions:
+[
+  
+{
+    "action": "query_1",
+    "parameters": {
+        "queries": [
+            "Saturday hours",
+            "late night dining",
+            "Mexican restaurant hours"
+        ]
+    },
+"result": {
+        "relevantContext": "# RELEVANT INFORMATION FOUND (only you can see this)\n## Saturday hours\nHours of operation:\nTake out, Monday-Sunday 11:30AM-8:00PM.\nIndoor Dining, Monday-Sunday 11:30AM-8:30PM.\nHours of operation:\nTake out, Monday-Sunday 11:30AM-8:00PM.\nIndoor Dining, Monday-Sunday 11:30AM-8:30PM.\nThis is an estimate and not based on real-time info.\n\nMondays - not busy. A little busy around 6-7pm.\nTuesdays - same\nWednesdays - same\nThursdays - A little busier around lunch and dinner\nFridays - Starts getting busy around 5pm and peaks around 6-7pm\nSaturdays - 1-2pm is very busy and still busy around 6pm\nSundays - Most busy around 2pm and steady decline before and after that\nThis is an estimate and not based on real-time info.\n\nMondays - not busy. A little busy around 6-7pm.\nTuesdays - same\nWednesdays - same\nThursdays - A little busier around lunch and dinner\nFridays - Starts getting busy around 5pm and peaks around 6-7pm\nSaturdays - 1-2pm is very busy and still busy around 6pm\nSundays - Most busy around 2pm and steady decline before and after that\nWe're open all statutory holidays except for Christmas\nWe're open all statutory holidays except for Christmas\n\n## late night dining\nDesserts (Assorted) — $9.00\n- Deep fried Ice Cream\n- Apple Fajitas\n- Churros\n- Grasshopper Pie\n- Margarita Pie\n\nDrinks — options include wine, beer, margaritas or soft drinks.\nWine:\n- Red Wine — Santa Carolina Cabernet Sauvignon 750 mL Bottle — $43\n- White Wine — Santa Carolina Chardonnay 750 mL Bottle — $43\n\nBeer:\n- Coors Lite — $8.50\n\nCocktails:\n- Margaritas — $12.95\nDesserts (Assorted) — $9.00\n- Deep fried Ice Cream\n- Apple Fajitas\n- Churros\n- Grasshopper Pie\n- Margarita Pie\n\nDrinks — options include wine, beer, margaritas or soft drinks.\nWine:\n- Red Wine — Santa Carolina Cabernet Sauvignon 750 mL Bottle — $43\n- White Wine — Santa Carolina Chardonnay 750 mL Bottle — $43\n\nBeer:\n- Coors Lite — $8.50\n\nCocktails:\n- Margaritas — $12.95\n\"Appetizers\" — Nacho (regular or large size). Corn chips made fresh in house. Your choice of:\n- Classic Nacho — Regular $20.00, Large $23.00\n  - Cheese and red sauce.\n- Chicken Nacho — Regular $22.00, Large $26.50\n  - Tomatillo sauce, pico de gallo.\n- Veggie Nacho — Regular $22.00, Large $26.50\n  - Diced vegetables, pico, red sauce.\n- Chili Nacho — Regular $22.00, Large $26.50\n  - Add chilli to regular nacho.\n- Guacamole — Single $10.50, Double $18.00\n  - Made fresh daily, served with in-house corn chips.\n- Chilis — $17.00\n  - All chili served with melted Jack cheese and our corn chips. Varieties:\n    - Charlie's Chili — made with sirloin and ground beef, medium heat.\n    - Vegetarian Chili — veggies, kidney beans, tofu.\n    - Texas Red Chili — pulled beef and cayenne peppers: spicy.\n- Feleena's Layer Dip — $19.00\n  - Black beans, taco beef, Jack cheese, pico de gallo, guacamole and sour cream; served with in-house corn chips.\n- Flautas — $19.95\n  - Deep fried flour tortillas, seasoned chicken breast, Jack cheese; served with guacamole, chipotle, tomatillo sauces and sour cream.\n- Club Quesadilla — $19.95\n  - Flour tortilla stuffed with seasoned chicken, bacon, pico de gallo, chipotle mayo and Jack cheese. Served with guacamole, sour cream and pico.\n- Taco Salad — $22.00\n  - Bed of romaine lettuce topped with Jack cheese, chicken breast, guacamole, sour cream, pico de gallo and ranch dressing served in a flour tortilla bowl.\n- Appetizer Platter — $26.50\n  - Combination of taquitos, flautas and veggie quesadillas. Served with guacamole, chipotle, tomatillo and sour cream.\n\"Appetizers\" — Nacho (regular or large size). Corn chips made fresh in house. Your choice of:\n- Classic Nacho — Regular $20.00, Large $23.00\n  - Cheese and red sauce.\n- Chicken Nacho — Regular $22.00, Large $26.50\n  - Tomatillo sauce, pico de gallo.\n- Veggie Nacho — Regular $22.00, Large $26.50\n  - Diced vegetables, pico, red sauce.\n- Chili Nacho — Regular $22.00, Large $26.50\n  - Add chilli to regular nacho.\n- Guacamole — Single $10.50, Double $18.00\n  - Made fresh daily, served with in-house corn chips.\n- Chilis — $17.00\n  - All chili served with melted Jack cheese and our corn chips. Varieties:\n    - Charlie's Chili — made with sirloin and ground beef, medium heat.\n    - Vegetarian Chili — veggies, kidney beans, tofu.\n    - Texas Red Chili — pulled beef and cayenne peppers: spicy.\n- Feleena's Layer Dip — $19.00\n  - Black beans, taco beef, Jack cheese, pico de gallo, guacamole and sour cream; served with in-house corn chips.\n- Flautas — $19.95\n  - Deep fried flour tortillas, seasoned chicken breast, Jack cheese; served with guacamole, chipotle, tomatillo sauces and sour cream.\n- Club Quesadilla — $19.95\n  - Flour tortilla stuffed with seasoned chicken, bacon, pico de gallo, chipotle mayo and Jack cheese. Served with guacamole, sour cream and pico.\n- Taco Salad — $22.00\n  - Bed of romaine lettuce topped with Jack cheese, chicken breast, guacamole, sour cream, pico de gallo and ranch dressing served in a flour tortilla bowl.\n- Appetizer Platter — $26.50\n  - Combination of taquitos, flautas and veggie quesadillas. Served with guacamole, chipotle, tomatillo and sour cream.\n\n## Mexican restaurant hours\n\"Appetizers\" — Nacho (regular or large size). Corn chips made fresh in house. Your choice of:\n- Classic Nacho — Regular $20.00, Large $23.00\n  - Cheese and red sauce.\n- Chicken Nacho — Regular $22.00, Large $26.50\n  - Tomatillo sauce, pico de gallo.\n- Veggie Nacho — Regular $22.00, Large $26.50\n  - Diced vegetables, pico, red sauce.\n- Chili Nacho — Regular $22.00, Large $26.50\n  - Add chilli to regular nacho.\n- Guacamole — Single $10.50, Double $18.00\n  - Made fresh daily, served with in-house corn chips.\n- Chilis — $17.00\n  - All chili served with melted Jack cheese and our corn chips. Varieties:\n    - Charlie's Chili — made with sirloin and ground beef, medium heat.\n    - Vegetarian Chili — veggies, kidney beans, tofu.\n    - Texas Red Chili — pulled beef and cayenne peppers: spicy.\n- Feleena's Layer Dip — $19.00\n  - Black beans, taco beef, Jack cheese, pico de gallo, guacamole and sour cream; served with in-house corn chips.\n- Flautas — $19.95\n  - Deep fried flour tortillas, seasoned chicken breast, Jack cheese; served with guacamole, chipotle, tomatillo sauces and sour cream.\n- Club Quesadilla — $19.95\n  - Flour tortilla stuffed with seasoned chicken, bacon, pico de gallo, chipotle mayo and Jack cheese. Served with guacamole, sour cream and pico.\n- Taco Salad — $22.00\n  - Bed of romaine lettuce topped with Jack cheese, chicken breast, guacamole, sour cream, pico de gallo and ranch dressing served in a flour tortilla bowl.\n- Appetizer Platter — $26.50\n  - Combination of taquitos, flautas and veggie quesadillas. Served with guacamole, chipotle, tomatillo and sour cream.\n\"Appetizers\" — Nacho (regular or large size). Corn chips made fresh in house. Your choice of:\n- Classic Nacho — Regular $20.00, Large $23.00\n  - Cheese and red sauce.\n- Chicken Nacho — Regular $22.00, Large $26.50\n  - Tomatillo sauce, pico de gallo.\n- Veggie Nacho — Regular $22.00, Large $26.50\n  - Diced vegetables, pico, red sauce.\n- Chili Nacho — Regular $22.00, Large $26.50\n  - Add chilli to regular nacho.\n- Guacamole — Single $10.50, Double $18.00\n  - Made fresh daily, served with in-house corn chips.\n- Chilis — $17.00\n  - All chili served with melted Jack cheese and our corn chips. Varieties:\n    - Charlie's Chili — made with sirloin and ground beef, medium heat.\n    - Vegetarian Chili — veggies, kidney beans, tofu.\n    - Texas Red Chili — pulled beef and cayenne peppers: spicy.\n- Feleena's Layer Dip — $19.00\n  - Black beans, taco beef, Jack cheese, pico de gallo, guacamole and sour cream; served with in-house corn chips.\n- Flautas — $19.95\n  - Deep fried flour tortillas, seasoned chicken breast, Jack cheese; served with guacamole, chipotle, tomatillo sauces and sour cream.\n- Club Quesadilla — $19.95\n  - Flour tortilla stuffed with seasoned chicken, bacon, pico de gallo, chipotle mayo and Jack cheese. Served with guacamole, sour cream and pico.\n- Taco Salad — $22.00\n  - Bed of romaine lettuce topped with Jack cheese, chicken breast, guacamole, sour cream, pico de gallo and ranch dressing served in a flour tortilla bowl.\n- Appetizer Platter — $26.50\n  - Combination of taquitos, flautas and veggie quesadillas. Served with guacamole, chipotle, tomatillo and sour cream.",
+        "sources": [
+            "",
+            "https://feleenas.ca/takeout.php"
+        ]
+    }
+}
+
+]
+
+- Please relay the results of the action to the user in a conversational manner if you haven't already.`,
+			},
+			{
+				role: "assistant",
+				content: `Hey! I can answer your questions!`,
+			},
+			{
+				role: "user",
+				content: `When are you open?`,
+			},
+			{
+				role: "assistant",
+				content: `We're open Monday to Sunday from 11:30AM to 8:00PM for takeout, and 11:30AM to 8:30PM for indoor dining.`,
+			},
+			{
+				role: "user",
+				content: `Are you open late on Saturday night`,
+			},
+		],
 	},
 ];
 
@@ -276,7 +355,9 @@ class LLMMonitor {
 		this.s3 = s3Client;
 		this.bucket = bucketName;
 		this.key = csvKey;
-		this.model = model;
+		this.models = models;
+		this.prompt_tokens = 0;
+		this.completion_tokens = 0;
 	}
 
 	async loadExistingData() {
@@ -317,49 +398,106 @@ class LLMMonitor {
 		}
 	}
 
-	async executePrompt(prompt) {
+	async chat(messages, model = "gemma2-9b-it", json_mode = false) {
+		const cleanedMessages = messages.map(({ role, content }) => ({
+			role,
+			content,
+		}));
+
+		const payload = {
+			model,
+			messages: cleanedMessages,
+		};
+
+		if (json_mode) {
+			payload.response_format = { type: "json_object" };
+		}
+
+		try {
+			// Try Groq first for llama models
+			if (model === "llama-3.3-70b-versatile") {
+				const groqResponse = await fetch(
+					"https://api.groq.com/openai/v1/chat/completions",
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+						},
+						body: JSON.stringify(payload),
+					}
+				);
+
+				if (!groqResponse.ok) {
+					const response = await groqResponse.json();
+					console.error("Groq API error:", response);
+					throw new Error(`Groq API error: ${groqResponse.status}`);
+				}
+
+				const data = await groqResponse.json();
+				this.prompt_tokens += data.usage.prompt_tokens;
+				this.completion_tokens += data.usage.completion_tokens;
+				return { data, choice: data.choices[0] };
+			} else {
+				// Use OpenAI for gpt models
+				const openaiResponse = await fetch(
+					"https://api.openai.com/v1/chat/completions",
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+						},
+						body: JSON.stringify({
+							...payload,
+							logprobs: true,
+							top_logprobs: 5, // Get top 5 logprobs for analysis
+						}),
+					}
+				);
+
+				if (!openaiResponse.ok) {
+					throw new Error(
+						`OpenAI API error: ${openaiResponse.status}`
+					);
+				}
+
+				const data = await openaiResponse.json();
+				this.prompt_tokens += data.usage.prompt_tokens;
+				this.completion_tokens += data.usage.completion_tokens;
+				return { data, choice: data.choices[0] };
+			}
+		} catch (error) {
+			console.error("Error:", error);
+			throw error;
+		}
+	}
+
+	async executePrompt(prompt, model) {
 		const startTime = performance.now();
 
 		try {
-			const response = await fetch(
-				"https://api.openai.com/v1/chat/completions",
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-					},
-					body: JSON.stringify({
-						model: this.model,
-						messages: prompt.messages,
-						logprobs: true,
-						top_logprobs: 5, // Get top 5 logprobs for analysis
-					}),
-				}
-			);
-
-			if (!response.ok) {
-				const error = await response.json();
-				console.error(error);
-				throw new Error(`OpenAI API error: ${response.status}`);
-			}
-
-			const data = await response.json();
-
+			const result = await this.chat(prompt.messages, model);
 			const endTime = performance.now();
-			const choice = data.choices[0];
 
-			return this.formatResult(prompt, data, choice, endTime - startTime);
+			return this.formatResult(
+				prompt,
+				result.data,
+				result.choice,
+				endTime - startTime,
+				model
+			);
 		} catch (error) {
 			return this.formatError(
 				prompt,
 				error,
-				performance.now() - startTime
+				performance.now() - startTime,
+				model
 			);
 		}
 	}
 
-	formatResult(prompt, response, choice, latencyMs) {
+	formatResult(prompt, response, choice, latencyMs, model) {
 		const usage = response.usage || {};
 		const promptTokensDetails = usage.prompt_tokens_details || {};
 		const completionTokensDetails = usage.completion_tokens_details || {};
@@ -368,7 +506,7 @@ class LLMMonitor {
 			timestamp: new Date().toISOString(),
 			promptId: prompt.id,
 			category: prompt.category,
-			model: response.model || this.model,
+			model: model || response.model,
 			latencyMs: Math.round(latencyMs),
 			success: true,
 			finishReason: choice.finish_reason,
@@ -404,12 +542,12 @@ class LLMMonitor {
 		};
 	}
 
-	formatError(prompt, error, latencyMs) {
+	formatError(prompt, error, latencyMs, model) {
 		return {
 			timestamp: new Date().toISOString(),
 			promptId: prompt.id,
 			category: prompt.category,
-			model: this.model,
+			model: model,
 			latencyMs: Math.round(latencyMs),
 			success: false,
 			finishReason: "error",
@@ -584,16 +722,30 @@ export async function monitorOnce() {
 
 	try {
 		console.log(
-			`🚀 Starting monitoring run with ${prompts.length} prompts...`
+			`🚀 Starting monitoring run with ${prompts.length} prompts and ${models.length} models...`
 		);
 
 		// Load existing data
 		const existingRecords = await monitor.loadExistingData();
 		console.log(`📊 Loaded ${existingRecords.length} existing records`);
 
-		// Execute all prompts concurrently with error handling
+		// Create all prompt-model combinations
+		const promptModelCombinations = [];
+		prompts.forEach((prompt) => {
+			models.forEach((model) => {
+				promptModelCombinations.push({ prompt, model });
+			});
+		});
+
+		console.log(
+			`📝 Testing ${promptModelCombinations.length} prompt-model combinations...`
+		);
+
+		// Execute all prompt-model combinations concurrently with error handling
 		const results = await Promise.allSettled(
-			prompts.map((prompt) => monitor.executePrompt(prompt))
+			promptModelCombinations.map(({ prompt, model }) =>
+				monitor.executePrompt(prompt, model)
+			)
 		);
 
 		// Process results and handle any rejections
@@ -601,11 +753,12 @@ export async function monitorOnce() {
 			if (result.status === "fulfilled") {
 				return result.value;
 			} else {
+				const { prompt, model } = promptModelCombinations[index];
 				console.error(
-					`❌ Prompt ${prompts[index].id} failed:`,
+					`❌ Prompt ${prompt.id} with model ${model} failed:`,
 					result.reason
 				);
-				return monitor.formatError(prompts[index], result.reason, 0);
+				return monitor.formatError(prompt, result.reason, 0, model);
 			}
 		});
 
@@ -620,13 +773,14 @@ export async function monitorOnce() {
 
 		// Generate and log summary statistics
 		const stats = monitor.generateSummaryStats(processedResults);
-		console.log("📈 Monitoring Summary:", JSON.stringify(stats, null, 2));
+		//console.log("📈 Monitoring Summary:", JSON.stringify(stats, null, 2));
 
 		return {
 			success: true,
 			timestamp: new Date().toISOString(),
 			stats,
 			recordCount: updatedRecords.length,
+			totalCombinations: promptModelCombinations.length,
 		};
 	} catch (error) {
 		console.error("💥 Monitoring run failed:", error);
@@ -645,6 +799,9 @@ export async function analyzeTimeSeriesData(
 	return LLMMonitor.analyzeTimeSeriesData(records, promptId, timeWindow);
 }
 
+monitorOnce().then((result) => {
+	console.log(result);
+});
 /*
 analyzeTimeSeriesData("customer-greeting").then((result) => {
 	console.log(result);
