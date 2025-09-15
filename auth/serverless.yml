@@ -3,7 +3,7 @@ service: auth
 stages:
     default:
         params:
-            customDomainNameAuthAPI: api.NA
+            customDomainNameAuthAPI: api.${param:customDomainName}
             dynamoDbUserTableName: user-table-${sls:stage}
 
 build:

@@ -1,92 +1,117 @@
 service: business
 
+frameworkVersion: "4"
+
 stages:
-  default:
-    params:
-      customDomainNameAuthAPI: api.NA
-      projectsTableName: projects-table-${sls:stage}
+    default:
+        params:
+            customDomainNameAuthAPI: api.${param:customDomainName}
+            projectsTableName: projects-table-${sls:stage}
 
 provider:
-  name: aws
-  runtime: nodejs20.x
-  environment:
-    SHARED_TOKEN_SECRET: ${param:sharedTokenSecret, 'DEFAULT'}
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-          Resource:
-            - Fn::GetAtt: [ProjectsTable, Arn]
-            - Fn::Join:
-                - ''
-                - - Fn::GetAtt: [ProjectsTable, Arn]
-                  - '/index/*'
+    name: aws
+    runtime: nodejs20.x
+    environment:
+        SHARED_TOKEN_SECRET: ${param:sharedTokenSecret, 'DEFAULT'}
+        PROJECTS_TABLE_NAME: ${param:projectsTableName}
+        OPENAI_API_KEY: ${env:OPENAI_API_KEY, 'DEFAULT'}
+        S3_BUCKET: ${env:S3_BUCKET, 'business-api-data'}
+        S3_KEY: ${env:S3_KEY, 'monitor_data.csv'}
+    iam:
+        role:
+            statements:
+                - Effect: Allow
+                  Action:
+                      - dynamodb:Query
+                      - dynamodb:Scan
+                      - dynamodb:GetItem
+                      - dynamodb:PutItem
+                      - dynamodb:UpdateItem
+                      - dynamodb:DeleteItem
+                  Resource:
+                      - Fn::GetAtt: [ProjectsTable, Arn]
+                      - Fn::Join:
+                            - ""
+                            - - Fn::GetAtt: [ProjectsTable, Arn]
+                              - "/index/*"
+                - Effect: Allow
+                  Action:
+                      - s3:ListBucket
+                      - s3:GetObject
+                      - s3:PutObject
+                      - s3:DeleteObject
+                  Resource:
+                      - "arn:aws:s3:::lm-opt-bucket"
+                      - "arn:aws:s3:::lm-opt-bucket/*"
+                      - "arn:aws:s3:::${env:S3_BUCKET, 'business-api-data'}"
+                      - "arn:aws:s3:::${env:S3_BUCKET, 'business-api-data'}/*"
 
 plugins:
-  - serverless-domain-manager
+    - serverless-domain-manager
 
 build:
-  esbuild: true
+    esbuild: true
 
 custom:
-  customDomain:
-    domainName: ${param:customDomainNameAuthAPI}
-    certificateArn: ${param:customDomainCertificateARN, 'NA'}
-    stage: ""
-    endpointType: regional
-    apiType: http
-    autoDomain: true
-    enabled: ${param:customDomainNameEnabled, false}
-    basePath: ${self:service}
+    customDomain:
+        domainName: ${param:customDomainNameAuthAPI}
+        certificateArn: ${param:customDomainCertificateARN, 'NA'}
+        stage: ""
+        endpointType: regional
+        apiType: http
+        autoDomain: true
+        enabled: ${param:customDomainNameEnabled, false}
+        basePath: ${self:service}
 
 functions:
-  api:
-    handler: handler.handler
-    events:
-      - httpApi:
-          path: /{proxy+}
-          method: any
-    environment:
-      PROJECTS_TABLE_NAME: ${param:projectsTableName}
+    httpApi:
+        handler: http_handler.handler
+        timeout: 120
+        events:
+            - http:
+                  path: "/{proxy+}"
+                  method: any
+    api:
+        handler: handler.handler
+        timeout: 30
+        events:
+            - httpApi:
+                  path: /{proxy+}
+                  method: any
+        environment:
+            PROJECTS_TABLE_NAME: ${param:projectsTableName}
 
 resources:
-  Conditions:
-    CustomDomainNameEnabled:
-      Fn::Equals:
-        - ${param:customDomainNameEnabled, false}
-        - true
-  Resources:
-    ProjectsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: projectId
-            AttributeType: S
-          - AttributeName: createdByUserId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: projectId
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${param:projectsTableName}
-        GlobalSecondaryIndexes:
-          - IndexName: createdByUserIdIndex
-            KeySchema:
-              - AttributeName: createdByUserId
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-  Outputs:
-    BusinessApiUrl:
-      Value:
-        Fn::If:
-          - CustomDomainNameEnabled
-          - !Sub "https://${param:customDomainNameAuthAPI}/${self:service}"
-          - !GetAtt HttpApi.ApiEndpoint
+    Conditions:
+        CustomDomainNameEnabled:
+            Fn::Equals:
+                - ${param:customDomainNameEnabled, false}
+                - true
+    Resources:
+        ProjectsTable:
+            Type: AWS::DynamoDB::Table
+            Properties:
+                AttributeDefinitions:
+                    - AttributeName: projectId
+                      AttributeType: S
+                    - AttributeName: createdByUserId
+                      AttributeType: S
+                KeySchema:
+                    - AttributeName: projectId
+                      KeyType: HASH
+                BillingMode: PAY_PER_REQUEST
+                TableName: ${param:projectsTableName}
+                GlobalSecondaryIndexes:
+                    - IndexName: createdByUserIdIndex
+                      KeySchema:
+                          - AttributeName: createdByUserId
+                            KeyType: HASH
+                      Projection:
+                          ProjectionType: ALL
+    Outputs:
+        BusinessApiUrl:
+            Value:
+                Fn::If:
+                    - CustomDomainNameEnabled
+                    - !Sub "https://${param:customDomainNameAuthAPI}/${self:service}"
+                    - !GetAtt HttpApi.ApiEndpoint

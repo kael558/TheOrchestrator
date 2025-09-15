@@ -6,7 +6,7 @@ plugins:
 stages:
     default:
         params:
-            customDomainNameChatApi: chat.NA
+            customDomainNameChatApi: chat.${param:customDomainName}
             dynamoDbUsageTableName: ${self:service}-usage-table-${sls:stage}
             throttleMonthlyLimitUser: 2000
             throttleMonthlyLimitGlobal: 2000000
